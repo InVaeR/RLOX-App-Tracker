@@ -1,0 +1,262 @@
+from typing import Dict
+
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
+    QTableWidgetItem, QHeaderView, QMessageBox, QDialog, QListWidget,
+    QListWidgetItem, QDialogButtonBox, QFileDialog, QLabel, QLineEdit,
+    QStackedWidget, QMenu, QInputDialog,
+)
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QAction
+
+from services.watchlist import WatchListManager
+from data.repository import Repository
+from core.process_scanner import list_running_apps
+from ui.components.empty_state import EmptyState
+from ui.components.app_icons import get_app_icon
+from ui.components.app_item_delegate import AppItemDelegate
+from ui.theme import _fmt
+
+
+class AddAppDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Добавить приложение")
+        self.setMinimumSize(560, 480)
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Выберите из запущенных процессов:"))
+        self.search_edit = QLineEdit(self)
+        self.search_edit.setPlaceholderText("Поиск...")
+        self.search_edit.textChanged.connect(self._filter_apps)
+        layout.addWidget(self.search_edit)
+        self.list_widget = QListWidget(self)
+        self.list_widget.setItemDelegate(AppItemDelegate(self.list_widget))
+        self.list_widget.setSpacing(2)
+        self._all_apps: Dict[str, str] = {}
+        self._populate_running_apps()
+        layout.addWidget(self.list_widget)
+        btn_browse = QPushButton("Обзор... (.exe)", self)
+        btn_browse.clicked.connect(self._browse_exe)
+        layout.addWidget(btn_browse)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+        self._selected_name = ""
+        self._selected_exe = ""
+
+    def _populate_running_apps(self):
+        self._all_apps = list_running_apps()
+        self._fill(self._all_apps)
+
+    def _fill(self, apps: dict):
+        self.list_widget.clear()
+        for name, exe in sorted(apps.items()):
+            item = QListWidgetItem(name)
+            item.setData(Qt.ItemDataRole.UserRole, exe)
+            icon = get_app_icon(exe)
+            if icon:
+                item.setData(Qt.ItemDataRole.DecorationRole, icon)
+            self.list_widget.addItem(item)
+
+    def _filter_apps(self, text: str):
+        t = text.lower()
+        filtered = {
+            n: e for n, e in self._all_apps.items()
+            if not t or t in n.lower() or t in e.lower()
+        }
+        self._fill(filtered)
+
+    def _browse_exe(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Выберите исполняемый файл", "", "Executable (*.exe)"
+        )
+        if path:
+            name = path.rsplit("\\", 1)[-1]
+            self._selected_name = name
+            self._selected_exe = path
+            self.accept()
+
+    def selected_app(self):
+        it = self.list_widget.currentItem()
+        if it:
+            self._selected_name = it.text()
+            self._selected_exe = it.data(Qt.ItemDataRole.UserRole) or ""
+        return self._selected_name, self._selected_exe
+
+
+class WatchListView(QWidget):
+    def __init__(self, watchlist_manager: WatchListManager,
+                 repo: Repository = None, on_changed=None, parent=None):
+        super().__init__(parent)
+        self.manager = watchlist_manager
+        self._repo = repo
+        self._on_changed = on_changed
+        self._current_sort_col = -1
+        self._current_sort_order = Qt.SortOrder.AscendingOrder
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(12)
+
+        title = QLabel("Отслеживаемые приложения")
+        title.setStyleSheet("font-size:20px; font-weight:700;")
+        layout.addWidget(title)
+
+        self._content_stack = QStackedWidget()
+
+        from ui.components.app_icons import asset_pixmap
+        self._empty = EmptyState(
+            "Список пуст",
+            "Добавьте приложения, время которых хотите отслеживать",
+            "＋ Добавить приложение", self._on_add,
+            pixmap=asset_pixmap("apps.png", 64),
+        )
+        self._content_stack.addWidget(self._empty)
+
+        self.table = QTableWidget(0, 4)
+        self.table.setHorizontalHeaderLabels(
+            ["Приложение", "Процесс", "Путь", "Сегодня"])
+        self.table.horizontalHeader().setStretchLastSection(False)
+        self.table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Interactive)
+        self.table.setColumnWidth(0, 220)
+        self.table.setColumnWidth(1, 160)
+        self.table.setColumnWidth(3, 120)
+        self.table.setAlternatingRowColors(True)
+        self.table.setShowGrid(False)
+        self.table.verticalHeader().setDefaultSectionSize(32)
+        self.table.setSortingEnabled(True)
+        self.table.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._context_menu)
+        self._content_stack.addWidget(self.table)
+
+        layout.addWidget(self._content_stack, 1)
+
+        btn_layout = QHBoxLayout()
+        btn_add = QPushButton("＋ Добавить приложение", self)
+        btn_add.setObjectName("primary")
+        btn_add.clicked.connect(self._on_add)
+        btn_remove = QPushButton("🗑  Удалить", self)
+        btn_remove.clicked.connect(self._on_remove)
+        btn_layout.addWidget(btn_add)
+        btn_layout.addWidget(btn_remove)
+        btn_layout.addStretch()
+        layout.addLayout(btn_layout)
+
+        self.refresh()
+
+    def refresh(self):
+        apps = self.manager.get_all()
+        today_map = self._repo.get_today_seconds_by_app() if self._repo else {}
+        sorting = self.table.isSortingEnabled()
+        self.table.setSortingEnabled(False)
+
+        if not apps:
+            self._content_stack.setCurrentWidget(self._empty)
+            return
+        self._content_stack.setCurrentWidget(self.table)
+
+        self.table.setRowCount(len(apps))
+        for i, app in enumerate(apps):
+            display = app.display_name or ""
+            icon = get_app_icon(app.exe_path)
+            item0 = QTableWidgetItem(display)
+            if icon:
+                item0.setIcon(icon)
+            item0.setData(Qt.ItemDataRole.UserRole, app.id)
+            item0.setFlags(item0.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            self.table.setItem(i, 0, item0)
+
+            for col, val in [
+                (1, app.process_name),
+                (2, app.exe_path or ""),
+            ]:
+                item = QTableWidgetItem(val)
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                self.table.setItem(i, col, item)
+
+            sec = today_map.get(app.process_name, 0)
+            h, m = sec // 3600, (sec % 3600) // 60
+            time_text = f"{h} ч {m} мин" if h else f"{m} мин"
+            time_item = QTableWidgetItem(time_text)
+            time_item.setData(Qt.ItemDataRole.UserRole, sec)
+            time_item.setFlags(
+                time_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            self.table.setItem(i, 3, time_item)
+
+        self.table.setSortingEnabled(sorting)
+
+    def refresh_times(self):
+        if not self._repo:
+            return
+        today = self._repo.get_today_seconds_by_app()
+        for row in range(self.table.rowCount()):
+            proc_item = self.table.item(row, 1)
+            if not proc_item:
+                continue
+            sec = today.get(proc_item.text(), 0)
+            h, m = sec // 3600, (sec % 3600) // 60
+            time_text = f"{h} ч {m} мин" if h else f"{m} мин"
+            self.table.item(row, 3).setText(time_text)
+            self.table.item(row, 3).setData(Qt.ItemDataRole.UserRole, sec)
+
+    def _on_add(self):
+        dlg = AddAppDialog(self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            name, exe = dlg.selected_app()
+            if name:
+                result = self.manager.add_app(name, exe, name)
+                if result == -1:
+                    QMessageBox.information(
+                        self, "Добавление",
+                        f"Приложение «{name}» уже в списке.")
+                if self._on_changed:
+                    self._on_changed()
+                self.refresh()
+
+    def _on_remove(self):
+        row = self.table.currentRow()
+        if row < 0:
+            return
+        self._remove_row(row)
+
+    def _remove_row(self, row):
+        app_id = self.table.item(row, 0).data(Qt.UserRole)
+        reply = QMessageBox.question(
+            self, "Подтверждение",
+            "Удалить приложение и всю статистику по нему?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self.manager.remove_app(app_id)
+            if self._on_changed:
+                self._on_changed()
+            self.refresh()
+
+    def _rename_row(self, row):
+        app_id = self.table.item(row, 0).data(Qt.UserRole)
+        current = self.table.item(row, 0).text()
+        new, ok = QInputDialog.getText(
+            self, "Переименовать",
+            "Отображаемое имя:", text=current
+        )
+        if ok and new.strip() and self._repo:
+            self._repo.update_display_name(app_id, new.strip())
+            self.refresh()
+
+    def _context_menu(self, pos):
+        row = self.table.rowAt(pos.y())
+        if row < 0:
+            return
+        menu = QMenu(self)
+        act_rename = menu.addAction("✎  Переименовать")
+        act_delete = menu.addAction("🗑  Удалить")
+        action = menu.exec(self.table.viewport().mapToGlobal(pos))
+        if action == act_delete:
+            self._remove_row(row)
+        elif action == act_rename:
+            self._rename_row(row)
