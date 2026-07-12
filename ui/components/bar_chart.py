@@ -12,6 +12,8 @@ class BarChartWidget(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground)
+        self.setStyleSheet("background: transparent;")
         self._stats = []
 
     def set_stats(self, stats):

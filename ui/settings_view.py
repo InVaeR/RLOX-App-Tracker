@@ -35,8 +35,11 @@ class SettingsView(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setStyleSheet("QScrollArea { background: transparent; }")
 
         content = QWidget()
+        content.setObjectName("settingsContent")
+        content.setStyleSheet(f"#settingsContent {{ background: {C.bg}; }}")
         layout = QVBoxLayout(content)
         layout.setContentsMargins(24, 16, 24, 24)
         layout.setSpacing(16)

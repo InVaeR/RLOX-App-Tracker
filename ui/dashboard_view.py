@@ -2,8 +2,9 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QComboBox,
     QLabel, QTableWidget, QTableWidgetItem, QHeaderView, QFrame,
     QGraphicsOpacityEffect, QStackedWidget, QPushButton, QFileDialog,
+    QScrollArea, QMessageBox,
 )
-from PySide6.QtCore import Qt, QPropertyAnimation, QEasingCurve
+from PySide6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QTimer
 from PySide6.QtGui import QPixmap
 
 from services.reporter import Reporter
@@ -118,13 +119,25 @@ class DashboardView(QWidget):
         self.reporter = reporter
         self._on_add_app = on_add_app
         self._stats: list[AppStats] = []
+        self._running_now = 0
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(S.xl, S.xl, S.xl, S.xl)
-        root.setSpacing(S.lg)
+        root.setContentsMargins(0, 0, 0, 0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setStyleSheet("QScrollArea { background: transparent; }")
+
+        content = QWidget()
+        content.setObjectName("dashContent")
+        content.setStyleSheet(f"#dashContent {{ background: {C.bg}; }}")
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(S.xl, S.xl, S.xl, S.xl)
+        layout.setSpacing(S.lg)
 
         self.live_card = LiveCard()
-        root.addWidget(self.live_card)
+        layout.addWidget(self.live_card)
 
         cards_row = QGridLayout()
         cards_row.setSpacing(S.md)
@@ -139,7 +152,7 @@ class DashboardView(QWidget):
             cards_row.addWidget(card, 0, i)
         for i, card in enumerate([self.card_running, self.card_top]):
             cards_row.addWidget(card, 1, i)
-        root.addLayout(cards_row)
+        layout.addLayout(cards_row)
 
         period_row = QHBoxLayout()
         period_row.setContentsMargins(0, 0, 0, 0)
@@ -156,15 +169,17 @@ class DashboardView(QWidget):
         self._btn_export = QPushButton("Экспорт CSV")
         self._btn_export.clicked.connect(self._export_csv)
         period_row.addWidget(self._btn_export)
-        root.addLayout(period_row)
+        layout.addLayout(period_row)
 
         self._chart_container = ChartContainer()
-        root.addWidget(self._chart_container)
+        layout.addWidget(self._chart_container)
 
         self._legend = Legend()
-        root.addWidget(self._legend)
+        layout.addWidget(self._legend)
 
         self._content_stack = QStackedWidget()
+        self._content_stack.setObjectName("dashContentStack")
+        self._content_stack.setStyleSheet("#dashContentStack { background: transparent; }")
         self._empty = EmptyState(
             "Нет данных",
             "Запустите отслеживаемое приложение, чтобы увидеть статистику",
@@ -175,21 +190,34 @@ class DashboardView(QWidget):
         self._table = QTableWidget(0, 4)
         self._table.setHorizontalHeaderLabels(
             ["Приложение", "Активное", "Фоновое", "Сессий"])
-        self._table.horizontalHeader().setStretchLastSection(True)
-        self._table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch)
+        self._table.horizontalHeader().setStretchLastSection(False)
+        hdr = self._table.horizontalHeader()
+        hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        hdr.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        hdr.resizeSection(3, 80)
         self._table.setAlternatingRowColors(True)
+        self._table.setStyleSheet(
+            f"QTableWidget {{ background: transparent; alternate-background-color: {C.surface_hover}; }} "
+            f"QTableWidget::item {{ background: transparent; }}"
+        )
         self._table.setShowGrid(False)
         self._table.verticalHeader().setDefaultSectionSize(32)
         self._table.setSortingEnabled(True)
         self._content_stack.addWidget(self._table)
         self._content_stack.addWidget(self._empty)
-        root.addWidget(self._content_stack, 1)
+        layout.addWidget(self._content_stack, 1)
+
+        scroll.setWidget(content)
+        root.addWidget(scroll)
 
         self.refresh()
 
     def update_live(self, info: dict):
         self.live_card.update_info(info)
+        self._running_now = len(info.get("running_apps", []))
+        self.card_running.set_value(str(self._running_now))
 
     def refresh(self):
         idx = self.period_combo.currentIndex()
@@ -214,8 +242,23 @@ class DashboardView(QWidget):
         path, _ = QFileDialog.getSaveFileName(
             self, "Экспорт статистики",
             f"rusloxpy_{period}.csv", "CSV (*.csv)")
-        if path:
+        if not path:
+            return
+        try:
             self.reporter.export_csv(self._stats, path)
+        except OSError as e:
+            QMessageBox.warning(
+                self, "Экспорт",
+                f"Не удалось сохранить файл:\n{e}\n\n"
+                "Возможно, файл открыт в другой программе.")
+            return
+        self._btn_export.setText("✓ Экспортировано")
+        self._btn_export.setEnabled(False)
+        QTimer.singleShot(1500, self._restore_export_btn)
+
+    def _restore_export_btn(self):
+        self._btn_export.setText("Экспорт CSV")
+        self._btn_export.setEnabled(True)
 
     def _update_contents(self, stats):
         has_data = any(
@@ -239,8 +282,7 @@ class DashboardView(QWidget):
             fmt_duration(background),
             f"{int(background / total * 100) if total else 0}%",
         )
-        running = len([s for s in stats if s.active_seconds + s.background_seconds > 0])
-        self.card_running.set_value(str(running))
+        self.card_running.set_value(str(self._running_now))
         top = max(
             stats,
             key=lambda s: s.active_seconds + s.background_seconds,
@@ -251,6 +293,8 @@ class DashboardView(QWidget):
                 top.display_name or top.process_name,
                 fmt_duration(top.active_seconds + top.background_seconds),
             )
+        else:
+            self.card_top.set_value("—", "")
 
     def _update_table(self, stats):
         if not stats:

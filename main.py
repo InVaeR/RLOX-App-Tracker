@@ -23,6 +23,7 @@ def acquire_single_instance():
     sock.connectToServer(_SINGLETON_KEY)
     if sock.waitForConnected(300):
         sock.disconnectFromServer()
+        sock.close()
         return None
     QLocalServer.removeServer(_SINGLETON_KEY)
     server = QLocalServer()
@@ -45,8 +46,8 @@ def main():
     server = acquire_single_instance()
     if server is None:
         logger.warning("Приложение уже запущено — выход")
-        sys.exit(0)
-    app._single_instance_server = server
+        return
+    app._single_instance_server = server # type: ignore
 
     db = Database()
     repo = Repository(db)
@@ -56,10 +57,11 @@ def main():
     tracker.start()
 
     window = MainWindow(repo, tracker, config)
-    window.db = db
+    window.db = db # type: ignore
     window.show()
 
     exit_code = app.exec()
+    server.close()
     logger.info("Завершение (code=%s)", exit_code)
     sys.exit(exit_code)
 

@@ -136,6 +136,8 @@ QGroupBox::title {{
     padding: 0 6px;
 }}
 
+QStackedWidget, QScrollArea {{ background: transparent; }}
+
 QScrollBar:vertical {{
     background: transparent; width: 10px; margin: 0;
 }}

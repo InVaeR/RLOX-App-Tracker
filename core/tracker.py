@@ -26,7 +26,7 @@ class _SessionState:
 @dataclass
 class _TickContext:
     now: datetime
-    delta: int
+    delta: float
     slept: bool
     idle_now: float
     focused_name: Optional[str]

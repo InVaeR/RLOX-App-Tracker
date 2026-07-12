@@ -16,6 +16,7 @@ from core.process_scanner import list_running_apps
 from ui.components.empty_state import EmptyState
 from ui.components.app_icons import get_app_icon, asset_pixmap
 from ui.components.app_item_delegate import AppItemDelegate
+from ui.theme import PALETTE as C
 from utils.format import fmt_duration
 
 
@@ -55,6 +56,7 @@ class AddAppDialog(QDialog):
         layout.addWidget(buttons)
         self._selected_name = ""
         self._selected_exe = ""
+        self._from_browse = False
 
     def _populate_running_apps(self):
         self._all_apps = list_running_apps()
@@ -89,13 +91,15 @@ class AddAppDialog(QDialog):
         if path:
             self._selected_name = Path(path).name
             self._selected_exe = path
+            self._from_browse = True
             self.accept()
 
     def selected_app(self):
-        it = self.list_widget.currentItem()
-        if it:
-            self._selected_name = it.text()
-            self._selected_exe = it.data(Qt.ItemDataRole.UserRole) or ""
+        if not self._from_browse:
+            it = self.list_widget.currentItem()
+            if it:
+                self._selected_name = it.text()
+                self._selected_exe = it.data(Qt.ItemDataRole.UserRole) or ""
         return self._selected_name, self._selected_exe
 
 
@@ -106,6 +110,8 @@ class WatchListView(QWidget):
         self.manager = watchlist_manager
         self._repo = repo
         self._on_changed = on_changed
+        self.setObjectName("watchlistView")
+        self.setStyleSheet(f"#watchlistView {{ background: {C.bg}; }}")
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
@@ -116,6 +122,8 @@ class WatchListView(QWidget):
         layout.addWidget(title)
 
         self._content_stack = QStackedWidget()
+        self._content_stack.setObjectName("wlContentStack")
+        self._content_stack.setStyleSheet("#wlContentStack { background: transparent; }")
 
         self._empty = EmptyState(
             "Список пуст",
@@ -135,16 +143,20 @@ class WatchListView(QWidget):
         self.table.setColumnWidth(1, 160)
         self.table.setColumnWidth(3, 120)
         self.table.setAlternatingRowColors(True)
+        self.table.setStyleSheet(
+            f"QTableWidget {{ background: transparent; alternate-background-color: {C.surface_hover}; }} "
+            f"QTableWidget::item {{ background: transparent; }}"
+        )
         self.table.setShowGrid(False)
         self.table.verticalHeader().setDefaultSectionSize(32)
         self.table.setSortingEnabled(True)
         self.table.setContextMenuPolicy(
             Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._context_menu)
-        self.table.cellDoubleClicked.connect(
-            lambda row, _col: self._rename_row(row))
+        self.table.cellDoubleClicked.connect(self._on_cell_dclick)
         sc_del = QShortcut(QKeySequence(QKeySequence.StandardKey.Delete),
                            self.table)
+        sc_del.setContext(Qt.ShortcutContext.WidgetShortcut)
         sc_del.activated.connect(self._on_remove)
         self._content_stack.addWidget(self.table)
 
@@ -166,14 +178,15 @@ class WatchListView(QWidget):
     def refresh(self):
         apps = self.manager.get_all()
         today_map = self._repo.get_today_seconds_by_app() if self._repo else {}
-        sorting = self.table.isSortingEnabled()
-        self.table.setSortingEnabled(False)
 
         if not apps:
             self._content_stack.setCurrentWidget(self._empty)
+            self.table.setRowCount(0)
             return
         self._content_stack.setCurrentWidget(self.table)
 
+        sorting = self.table.isSortingEnabled()
+        self.table.setSortingEnabled(False)
         self.table.setRowCount(len(apps))
         for i, app in enumerate(apps):
             display = app.display_name or ""
@@ -206,13 +219,17 @@ class WatchListView(QWidget):
         if not self._repo:
             return
         today = self._repo.get_today_seconds_by_app()
+        sorting = self.table.isSortingEnabled()
+        self.table.setSortingEnabled(False)
         for row in range(self.table.rowCount()):
             proc_item = self.table.item(row, 1)
-            if not proc_item:
+            time_item = self.table.item(row, 3)
+            if not proc_item or not time_item:
                 continue
             sec = today.get(proc_item.text(), 0)
-            self.table.item(row, 3).setText(fmt_duration(sec, short=True))
-            self.table.item(row, 3).setData(Qt.ItemDataRole.UserRole, sec)
+            time_item.setText(fmt_duration(sec, short=True))
+            time_item.setData(Qt.ItemDataRole.UserRole, sec)
+        self.table.setSortingEnabled(sorting)
 
     def _on_add(self):
         dlg = AddAppDialog(self)
@@ -246,6 +263,10 @@ class WatchListView(QWidget):
             if self._on_changed:
                 self._on_changed()
             self.refresh()
+
+    def _on_cell_dclick(self, row: int, col: int):
+        if col == 0:
+            self._rename_row(row)
 
     def _rename_row(self, row):
         app_id = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
