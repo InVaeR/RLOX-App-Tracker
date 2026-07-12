@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QComboBox,
     QLabel, QTableWidget, QTableWidgetItem, QHeaderView, QFrame,
-    QGraphicsOpacityEffect, QStackedWidget,
+    QGraphicsOpacityEffect, QStackedWidget, QPushButton, QFileDialog,
 )
 from PySide6.QtCore import Qt, QPropertyAnimation, QEasingCurve
 from PySide6.QtGui import QPixmap
@@ -153,6 +153,9 @@ class DashboardView(QWidget):
         self.period_combo.currentIndexChanged.connect(self._on_period_change)
         period_row.addWidget(self.period_combo)
         period_row.addStretch()
+        self._btn_export = QPushButton("Экспорт CSV")
+        self._btn_export.clicked.connect(self._export_csv)
+        period_row.addWidget(self._btn_export)
         root.addLayout(period_row)
 
         self._chart_container = ChartContainer()
@@ -165,6 +168,8 @@ class DashboardView(QWidget):
         self._empty = EmptyState(
             "Нет данных",
             "Запустите отслеживаемое приложение, чтобы увидеть статистику",
+            button_text="＋ Добавить приложение" if on_add_app else "",
+            on_click=on_add_app,
             pixmap=asset_pixmap("stats.png", 64),
         )
         self._table = QTableWidget(0, 4)
@@ -202,7 +207,21 @@ class DashboardView(QWidget):
     def _on_period_change(self):
         self.refresh()
 
+    def _export_csv(self):
+        if not self._stats:
+            return
+        period = self.period_combo.currentText().replace(" ", "_").lower()
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Экспорт статистики",
+            f"rusloxpy_{period}.csv", "CSV (*.csv)")
+        if path:
+            self.reporter.export_csv(self._stats, path)
+
     def _update_contents(self, stats):
+        has_data = any(
+            s.active_seconds + s.background_seconds > 0 for s in stats)
+        self._chart_container.setVisible(has_data)
+        self._legend.setVisible(has_data)
         self._chart_container.set_stats(stats)
         self._update_cards(stats)
         self._update_table(stats)

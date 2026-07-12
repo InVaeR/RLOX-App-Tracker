@@ -1,12 +1,11 @@
-from datetime import datetime
-
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QPushButton,
     QLabel, QButtonGroup, QStatusBar, QSystemTrayIcon, QMenu,
     QApplication,
 )
 from PySide6.QtCore import Qt, QTimer, QSize
-from PySide6.QtGui import QIcon, QPixmap, QPainter, QBrush, QColor, QAction
+from PySide6.QtGui import (QIcon, QPixmap, QPainter, QBrush, QColor,
+                           QAction, QShortcut, QKeySequence)
 
 from ui.dashboard_view import DashboardView
 from ui.watchlist_view import WatchListView
@@ -20,7 +19,8 @@ from data.repository import Repository
 from services.config_manager import ConfigManager
 from services.reporter import Reporter
 from services.watchlist import WatchListManager
-from services.updater import check_for_update
+from services.update_worker import check_for_update_async
+from utils.format import fmt_duration
 from config import ICON_PATH, APP_VERSION
 
 
@@ -45,6 +45,7 @@ class MainWindow(QMainWindow):
         self.tracker = tracker
         self.config = config
         self._closing = False
+        self._watched_count = len(repo.get_all_watched_apps())
 
         self.setWindowTitle("RusLOXPy")
         self.setMinimumSize(960, 640)
@@ -54,7 +55,7 @@ class MainWindow(QMainWindow):
 
         self.dashboard_view = DashboardView(reporter, on_add_app=self._show_apps)
         self.watchlist_view = WatchListView(watchlist_mgr, repo,
-                                            on_changed=self.tracker.invalidate_cache)
+                                            on_changed=self._on_watchlist_changed)
         self.settings_view = SettingsView(config, repo,
             on_settings_changed=self._on_settings_changed,
             on_data_cleared=self._on_data_cleared)
@@ -116,10 +117,15 @@ class MainWindow(QMainWindow):
         self.nav_group.idClicked.connect(self._on_nav)
         self.btn_dash.setChecked(True)
 
+        for i, key in enumerate(("Ctrl+1", "Ctrl+2", "Ctrl+3")):
+            sc = QShortcut(QKeySequence(key), self)
+            sc.activated.connect(lambda idx=i: self._nav_to(idx))
+
         self.setStatusBar(QStatusBar())
         self._status_timer = QTimer(self)
         self._status_timer.timeout.connect(self._refresh_status)
-        self._status_timer.start(1000)
+        self._status_timer.start(5000)
+        self._refresh_status()
 
         self._live_refresh = QTimer(self)
         self._live_refresh.timeout.connect(self._on_live_refresh)
@@ -129,6 +135,7 @@ class MainWindow(QMainWindow):
 
         self.tracker.stats_updated.connect(self.dashboard_view.refresh)
         self.tracker.active_app_info.connect(self.dashboard_view.update_live)
+        self.tracker.active_app_info.connect(self._update_tray_tooltip)
         self.tracker.tracking_paused.connect(self._on_tracking_paused)
         self.tracker.tracking_resumed.connect(self._on_tracking_resumed)
         self.pause_banner.resume_clicked.connect(self.tracker.resume)
@@ -137,22 +144,7 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(3000, self._check_update_startup)
 
     def _check_update_startup(self):
-        from PySide6.QtCore import QThreadPool, QRunnable, QObject, Signal
-
-        class _Signals(QObject):
-            done = Signal(object)
-
-        class _Task(QRunnable):
-            def __init__(self, sig):
-                super().__init__()
-                self.sig = sig
-
-            def run(self):
-                self.sig.done.emit(check_for_update())
-
-        self._upd_sig = _Signals()
-        self._upd_sig.done.connect(self._show_update_dialog)
-        QThreadPool.globalInstance().start(_Task(self._upd_sig))
+        self._upd_sig = check_for_update_async(self._show_update_dialog)
 
     def _show_update_dialog(self, info):
         from PySide6.QtWidgets import QMessageBox
@@ -168,6 +160,10 @@ class MainWindow(QMainWindow):
         if r == QMessageBox.StandardButton.Yes:
             webbrowser.open(info.url)
 
+    def _nav_to(self, idx: int):
+        self.nav_group.button(idx).setChecked(True)
+        self.stack.setCurrentIndex(idx)
+
     def _on_nav(self, idx: int):
         self.stack.setCurrentIndex(idx)
 
@@ -178,6 +174,7 @@ class MainWindow(QMainWindow):
     def _on_data_cleared(self):
         self.tracker.reset_all(emit=False)
         self.repo.clear_all_data()
+        self._watched_count = 0
         self.dashboard_view.refresh()
         self.dashboard_view.update_live({"paused": self.tracker.is_paused,
                                          "running_apps": [], "focused": None,
@@ -186,6 +183,10 @@ class MainWindow(QMainWindow):
 
     def _on_settings_changed(self):
         self.tracker.update_settings()
+
+    def _on_watchlist_changed(self):
+        self.tracker.invalidate_cache()
+        self._watched_count = len(self.repo.get_all_watched_apps())
 
     def _on_tracking_paused(self):
         self._pause_action.setChecked(True)
@@ -205,10 +206,8 @@ class MainWindow(QMainWindow):
         if self.tracker.is_paused:
             self.statusBar().showMessage("Отслеживание приостановлено")
         else:
-            n = len(self.repo.get_all_watched_apps())
             self.statusBar().showMessage(
-                f"Отслеживается приложений: {n}  ·  "
-                f"обновлено {datetime.now():%H:%M:%S}")
+                f"Отслеживается приложений: {self._watched_count}")
 
     def _on_live_refresh(self):
         if self.stack.currentWidget() is self.dashboard_view:
@@ -241,6 +240,17 @@ class MainWindow(QMainWindow):
         if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
             self.showNormal()
             self.activateWindow()
+
+    def _update_tray_tooltip(self, info: dict):
+        if info.get("paused"):
+            self.tray_icon.setToolTip("RusLOXPy — пауза")
+        elif info.get("focused"):
+            name = info.get("focused_display") or info.get("focused")
+            sec = info.get("focused_sec", 0)
+            self.tray_icon.setToolTip(
+                f"RusLOXPy — {name} · {fmt_duration(sec, short=True)}")
+        else:
+            self.tray_icon.setToolTip("RusLOXPy")
 
     def _toggle_pause(self, checked):
         if checked:

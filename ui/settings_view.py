@@ -1,5 +1,6 @@
 import webbrowser
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QSpinBox, QDoubleSpinBox,
     QCheckBox, QPushButton, QMessageBox, QGroupBox, QLabel,
@@ -7,7 +8,7 @@ from PySide6.QtWidgets import (
 )
 from services.config_manager import ConfigManager
 from services.autostart import enable_autostart, disable_autostart, is_autostart_enabled
-from services.updater import check_for_update
+from services.update_worker import check_for_update_async
 from data.repository import Repository
 from version import __version__
 from config import DEFAULT_IDLE_THRESHOLD, DEFAULT_POLL_INTERVAL, DEFAULT_SAVE_TITLES, DEFAULT_MINIMIZE_TO_TRAY
@@ -78,10 +79,10 @@ class SettingsView(QWidget):
         bf.addRow("Проверять обновления при запуске:", self.updates_check)
         layout.addWidget(behavior)
 
-        btn_save = QPushButton("Сохранить")
-        btn_save.setObjectName("primary")
-        btn_save.clicked.connect(self._save)
-        layout.addWidget(btn_save)
+        self._btn_save = QPushButton("Сохранить")
+        self._btn_save.setObjectName("primary")
+        self._btn_save.clicked.connect(self._save)
+        layout.addWidget(self._btn_save)
 
         danger = self._group("Опасная зона")
         dl = QVBoxLayout(danger)
@@ -96,9 +97,9 @@ class SettingsView(QWidget):
 
         about = self._group(f"О программе — v{__version__}")
         al = QVBoxLayout(about)
-        btn_update = QPushButton("Проверить обновления")
-        btn_update.clicked.connect(self._check_update)
-        al.addWidget(btn_update)
+        self._btn_update = QPushButton("Проверить обновления")
+        self._btn_update.clicked.connect(self._check_update)
+        al.addWidget(self._btn_update)
         layout.addWidget(about)
 
         layout.addStretch()
@@ -107,7 +108,13 @@ class SettingsView(QWidget):
         outer.addWidget(scroll)
 
     def _check_update(self):
-        info = check_for_update()
+        self._btn_update.setEnabled(False)
+        self._btn_update.setText("Проверка…")
+        self._upd_sig = check_for_update_async(self._on_update_result)
+
+    def _on_update_result(self, info):
+        self._btn_update.setEnabled(True)
+        self._btn_update.setText("Проверить обновления")
         if info:
             msg = f"Доступна версия {info.version}."
             if info.notes:
@@ -137,7 +144,13 @@ class SettingsView(QWidget):
             disable_autostart()
         if self._on_settings_changed:
             self._on_settings_changed()
-        QMessageBox.information(self, "Настройки", "Настройки сохранены.")
+        self._btn_save.setText("✓ Сохранено")
+        self._btn_save.setEnabled(False)
+        QTimer.singleShot(1500, self._restore_save_btn)
+
+    def _restore_save_btn(self):
+        self._btn_save.setText("Сохранить")
+        self._btn_save.setEnabled(True)
 
     def _clear_data(self):
         reply = QMessageBox.warning(

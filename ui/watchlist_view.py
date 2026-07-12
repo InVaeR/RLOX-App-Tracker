@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
 )
 from pathlib import Path
 
+from PySide6.QtGui import QShortcut, QKeySequence
 from PySide6.QtCore import Qt
 from services.watchlist import WatchListManager
 from data.repository import Repository
@@ -25,13 +26,21 @@ class AddAppDialog(QDialog):
         self.setMinimumSize(560, 480)
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Выберите из запущенных процессов:"))
+        search_row = QHBoxLayout()
         self.search_edit = QLineEdit(self)
         self.search_edit.setPlaceholderText("Поиск...")
         self.search_edit.textChanged.connect(self._filter_apps)
-        layout.addWidget(self.search_edit)
+        search_row.addWidget(self.search_edit, 1)
+        btn_refresh = QPushButton("⟳", self)
+        btn_refresh.setToolTip("Обновить список процессов")
+        btn_refresh.setFixedWidth(40)
+        btn_refresh.clicked.connect(self._reload)
+        search_row.addWidget(btn_refresh)
+        layout.addLayout(search_row)
         self.list_widget = QListWidget(self)
         self.list_widget.setItemDelegate(AppItemDelegate(self.list_widget))
         self.list_widget.setSpacing(2)
+        self.list_widget.itemDoubleClicked.connect(lambda _: self.accept())
         self._all_apps: Dict[str, str] = {}
         self._populate_running_apps()
         layout.addWidget(self.list_widget)
@@ -50,6 +59,10 @@ class AddAppDialog(QDialog):
     def _populate_running_apps(self):
         self._all_apps = list_running_apps()
         self._fill(self._all_apps)
+
+    def _reload(self):
+        self._populate_running_apps()
+        self._filter_apps(self.search_edit.text())
 
     def _fill(self, apps: dict):
         self.list_widget.clear()
@@ -128,6 +141,11 @@ class WatchListView(QWidget):
         self.table.setContextMenuPolicy(
             Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._context_menu)
+        self.table.cellDoubleClicked.connect(
+            lambda row, _col: self._rename_row(row))
+        sc_del = QShortcut(QKeySequence(QKeySequence.StandardKey.Delete),
+                           self.table)
+        sc_del.activated.connect(self._on_remove)
         self._content_stack.addWidget(self.table)
 
         layout.addWidget(self._content_stack, 1)

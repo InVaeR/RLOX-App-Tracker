@@ -1,3 +1,4 @@
+import csv
 from typing import List
 
 from data.repository import Repository
@@ -19,3 +20,18 @@ class Reporter:
 
     def get_all_time_stats(self) -> List[AppStats]:
         return self.repo.get_stats(period_days=None)
+
+    @staticmethod
+    def export_csv(stats: List[AppStats], path: str):
+        with open(path, "w", newline="", encoding="utf-8-sig") as f:
+            w = csv.writer(f, delimiter=";")
+            w.writerow(["Приложение", "Процесс",
+                        "Активное (сек)", "Фоновое (сек)", "Сессий"])
+            for s in stats:
+                w.writerow([
+                    s.display_name or s.process_name,
+                    s.process_name,
+                    s.active_seconds,
+                    s.background_seconds,
+                    s.session_count,
+                ])
