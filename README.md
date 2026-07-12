@@ -1,8 +1,8 @@
 # RusLOXPy
 
-[![Release](https://img.shields.io/github/v/release/RusLOX/RusLOXPy)](https://github.com/RusLOX/RusLOXPy/releases/latest)
+[![Release](https://img.shields.io/github/v/release/InVaeR/RusLOXPy)](https://github.com/InVaeR/RusLOXPy/releases/latest)
 
-> Скачать готовый `.exe`: [Releases](https://github.com/RusLOX/RusLOXPy/releases/latest)
+> Скачать готовый `.exe`: [Releases](https://github.com/InVaeR/RusLOXPy/releases/latest)
 
 Отслеживание времени использования выбранных пользователем приложений на **Windows** (только x64).
 

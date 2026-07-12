@@ -72,6 +72,10 @@ class SettingsView(QWidget):
         self.autostart_check = QCheckBox()
         self.autostart_check.setChecked(is_autostart_enabled())
         bf.addRow("Автозапуск с Windows:", self.autostart_check)
+        self.updates_check = QCheckBox()
+        self.updates_check.setChecked(
+            self.config.get_bool("check_updates_on_start", True))
+        bf.addRow("Проверять обновления при запуске:", self.updates_check)
         layout.addWidget(behavior)
 
         btn_save = QPushButton("Сохранить")
@@ -126,6 +130,7 @@ class SettingsView(QWidget):
         self.config.set("poll_interval", self.poll_spin.value())
         self.config.set("save_window_titles", self.titles_check.isChecked())
         self.config.set("minimize_to_tray", self.minimize_check.isChecked())
+        self.config.set("check_updates_on_start", self.updates_check.isChecked())
         if self.autostart_check.isChecked():
             enable_autostart()
         else:

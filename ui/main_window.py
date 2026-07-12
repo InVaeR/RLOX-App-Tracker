@@ -20,7 +20,8 @@ from data.repository import Repository
 from services.config_manager import ConfigManager
 from services.reporter import Reporter
 from services.watchlist import WatchListManager
-from config import ICON_PATH
+from services.updater import check_for_update
+from config import ICON_PATH, APP_VERSION
 
 
 class NavButton(QPushButton):
@@ -131,6 +132,41 @@ class MainWindow(QMainWindow):
         self.tracker.tracking_paused.connect(self._on_tracking_paused)
         self.tracker.tracking_resumed.connect(self._on_tracking_resumed)
         self.pause_banner.resume_clicked.connect(self.tracker.resume)
+
+        if self.config.get_bool("check_updates_on_start", True):
+            QTimer.singleShot(3000, self._check_update_startup)
+
+    def _check_update_startup(self):
+        from PySide6.QtCore import QThreadPool, QRunnable, QObject, Signal
+
+        class _Signals(QObject):
+            done = Signal(object)
+
+        class _Task(QRunnable):
+            def __init__(self, sig):
+                super().__init__()
+                self.sig = sig
+
+            def run(self):
+                self.sig.done.emit(check_for_update())
+
+        self._upd_sig = _Signals()
+        self._upd_sig.done.connect(self._show_update_dialog)
+        QThreadPool.globalInstance().start(_Task(self._upd_sig))
+
+    def _show_update_dialog(self, info):
+        from PySide6.QtWidgets import QMessageBox
+        import webbrowser
+        if not info:
+            return
+        msg = f"Доступна версия {info.version} (текущая: {APP_VERSION})."
+        if info.notes:
+            msg += f"\n\n{info.notes[:500]}"
+        r = QMessageBox.information(
+            self, "Обновление", msg,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if r == QMessageBox.StandardButton.Yes:
+            webbrowser.open(info.url)
 
     def _on_nav(self, idx: int):
         self.stack.setCurrentIndex(idx)
