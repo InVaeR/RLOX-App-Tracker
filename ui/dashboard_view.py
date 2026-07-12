@@ -14,7 +14,7 @@ from ui.components.stat_card import StatCard
 from ui.components.bar_chart import ChartContainer
 from ui.components.legend import Legend
 from ui.components.empty_state import EmptyState
-from ui.components.app_icons import asset_pixmap
+from ui.components.app_icons import get_app_icon, asset_pixmap
 from utils.pixmap import tint_pixmap
 from data.models import AppStats
 
@@ -190,19 +190,17 @@ class DashboardView(QWidget):
         self._table = QTableWidget(0, 4)
         self._table.setHorizontalHeaderLabels(
             ["Приложение", "Активное", "Фоновое", "Сессий"])
-        self._table.horizontalHeader().setStretchLastSection(False)
         hdr = self._table.horizontalHeader()
         hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        hdr.resizeSection(1, 120)
+        hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        hdr.resizeSection(2, 120)
         hdr.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-        hdr.resizeSection(3, 80)
-        self._table.setAlternatingRowColors(True)
-        self._table.setStyleSheet(
-            f"QTableWidget {{ background-color: transparent; alternate-background-color: {C.surface_hover}; }}"
-        )
+        hdr.resizeSection(3, 65)
+        self._table.setAlternatingRowColors(False)
         self._table.setShowGrid(False)
-        self._table.verticalHeader().setDefaultSectionSize(32)
+        self._table.verticalHeader().hide()
         self._table.setSortingEnabled(True)
         self._content_stack.addWidget(self._table)
         self._content_stack.addWidget(self._empty)
@@ -307,6 +305,9 @@ class DashboardView(QWidget):
         for i, s in enumerate(stats):
             name = s.display_name or s.process_name
             name_item = QTableWidgetItem(name)
+            icon = get_app_icon(s.exe_path) if s.exe_path else None
+            if icon:
+                name_item.setIcon(icon)
             name_item.setData(Qt.ItemDataRole.UserRole, name)
             name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self._table.setItem(i, 0, name_item)

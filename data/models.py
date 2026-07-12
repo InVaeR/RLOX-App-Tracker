@@ -31,3 +31,4 @@ class AppStats:
     active_seconds: int
     background_seconds: int
     session_count: int
+    exe_path: Optional[str] = None

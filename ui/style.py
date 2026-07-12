@@ -49,19 +49,27 @@ QTableWidget {{
     selection-color: {C.text};
 }}
 QTableWidget::item {{
-    padding: 10px 12px;
+    padding: 8px 12px;
     border-bottom: 1px solid {C.border};
+    background-color: transparent;
+    color: {C.text};
+}}
+QTableWidget::item:hover {{
+    background-color: {C.surface_hover};
+}}
+QHeaderView {{
+    background-color: transparent;
 }}
 QHeaderView::section {{
-    background: transparent;
+    background-color: transparent;
     border: none;
     border-bottom: 1px solid {C.border};
-    padding: 10px 12px;
-    color: {C.text_dim};
+    padding: 8px 12px;
+    color: {C.text_muted};
     font-size: 12px;
     font-weight: 600;
 }}
-QTableCornerButton::section {{ background: transparent; border: none; }}
+QTableCornerButton::section {{ background-color: transparent; border: none; }}
 
 QPushButton {{
     background-color: {C.surface};

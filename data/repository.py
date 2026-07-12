@@ -91,7 +91,7 @@ class Repository:
             params = (f"-{days_offset} days",)
 
         query = f"""
-            SELECT w.process_name, w.display_name,
+            SELECT w.process_name, w.display_name, w.exe_path,
                    COALESCE(SUM(s.active_sec), 0) as active_seconds,
                    COALESCE(SUM(s.background_sec), 0) as background_seconds,
                    COUNT(s.id) as session_count

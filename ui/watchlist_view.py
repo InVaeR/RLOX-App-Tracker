@@ -136,18 +136,17 @@ class WatchListView(QWidget):
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(
             ["Приложение", "Процесс", "Путь", "Сегодня"])
-        self.table.horizontalHeader().setStretchLastSection(False)
-        self.table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Interactive)
-        self.table.setColumnWidth(0, 220)
-        self.table.setColumnWidth(1, 160)
-        self.table.setColumnWidth(3, 120)
-        self.table.setAlternatingRowColors(True)
-        self.table.setStyleSheet(
-            f"QTableWidget {{ background-color: transparent; alternate-background-color: {C.surface_hover}; }}"
-        )
+        hdr = self.table.horizontalHeader()
+        hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+        hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
+        hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        hdr.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        self.table.setColumnWidth(0, 200)
+        self.table.setColumnWidth(1, 140)
+        hdr.resizeSection(3, 100)
+        self.table.setAlternatingRowColors(False)
         self.table.setShowGrid(False)
-        self.table.verticalHeader().setDefaultSectionSize(32)
+        self.table.verticalHeader().hide()
         self.table.setSortingEnabled(True)
         self.table.setContextMenuPolicy(
             Qt.ContextMenuPolicy.CustomContextMenu)
