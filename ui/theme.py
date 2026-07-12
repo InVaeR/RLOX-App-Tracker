@@ -41,16 +41,4 @@ class Radius:
 PALETTE = Palette()
 SPACING = Spacing()
 RADIUS = Radius()
-FONT_FAMILY = "Segoe UI"
-
-
-def _fmt(seconds: int) -> str:
-    h = seconds // 3600
-    m = (seconds % 3600) // 60
-    s = seconds % 60
-    if h:
-        return f"{h} ч {m} мин"
-    if m:
-        return f"{m} мин {s} сек"
-    return f"{s} сек"
 

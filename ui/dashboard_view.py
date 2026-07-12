@@ -4,15 +4,17 @@ from PySide6.QtWidgets import (
     QGraphicsOpacityEffect, QStackedWidget,
 )
 from PySide6.QtCore import Qt, QPropertyAnimation, QEasingCurve
-from PySide6.QtGui import QPalette, QPainter, QPixmap
+from PySide6.QtGui import QPixmap
 
 from services.reporter import Reporter
-from ui.theme import _fmt, PALETTE as C, SPACING as S
+from ui.theme import PALETTE as C, SPACING as S
+from utils.format import fmt_duration
 from ui.components.stat_card import StatCard
 from ui.components.bar_chart import ChartContainer
 from ui.components.legend import Legend
 from ui.components.empty_state import EmptyState
 from ui.components.app_icons import asset_pixmap
+from utils.pixmap import tint_pixmap
 from data.models import AppStats
 
 
@@ -32,13 +34,7 @@ class LiveCard(QFrame):
         pulse_pix = asset_pixmap("point.png", 16)
         self._pulse = QLabel()
         if not pulse_pix.isNull():
-            pm = QPixmap(pulse_pix)
-            from PySide6.QtGui import QPainter as QP, QColor as QC
-            p = QP(pm)
-            p.setCompositionMode(QP.CompositionMode.CompositionMode_SourceIn)
-            p.fillRect(pm.rect(), QC(C.success))
-            p.end()
-            self._pulse.setPixmap(pm)
+            self._pulse.setPixmap(tint_pixmap(QPixmap(pulse_pix), C.success))
         else:
             self._pulse.setText("●")
             self._pulse.setStyleSheet(f"color:{C.success}; font-size:14px;")
@@ -75,13 +71,7 @@ class LiveCard(QFrame):
     def _tint_pulse(self, color: str):
         pulse_pix = asset_pixmap("point.png", 16)
         if not pulse_pix.isNull():
-            pm = QPixmap(pulse_pix)
-            from PySide6.QtGui import QPainter as QP, QColor as QC
-            p = QP(pm)
-            p.setCompositionMode(QP.CompositionMode.CompositionMode_SourceIn)
-            p.fillRect(pm.rect(), QC(color))
-            p.end()
-            self._pulse.setPixmap(pm)
+            self._pulse.setPixmap(tint_pixmap(QPixmap(pulse_pix), color))
         else:
             self._pulse.setStyleSheet(f"color:{color}; font-size:14px;")
 
@@ -92,24 +82,32 @@ class LiveCard(QFrame):
             self._live_timer.setText("—")
             self._tint_pulse(C.warning)
             return
-        focused = info.get("focused", "")
-        display_name = info.get("focused_display", "") or focused
-        sec = info.get("focused_sec", 0)
+
+        focused = info.get("focused")
+        background = info.get("background_apps", [])
+
         if focused:
+            display_name = info.get("focused_display") or focused
+            sec = info.get("focused_sec", 0)
             self._live_name.setText(display_name)
-            self._live_detail.setText("Активное окно")
-            self._live_timer.setText(_fmt(sec))
-            self._tint_pulse(C.success)
-        else:
-            running = info.get("running_apps", [])
-            if running:
-                names = ", ".join(
-                    a.get("display_name", a["name"]) for a in running[:5])
-                self._live_name.setText(f"Запущено: {len(running)}")
-                self._live_detail.setText(names)
+            if background:
+                bg_names = ", ".join(
+                    a.get("display_name", a["name"]) for a in background[:4])
+                self._live_detail.setText(f"Активно · В фоне: {bg_names}")
             else:
-                self._live_name.setText("Ожидание…")
-                self._live_detail.setText("Нет запущенных отслеживаемых приложений")
+                self._live_detail.setText("Активное окно")
+            self._live_timer.setText(fmt_duration(sec))
+            self._tint_pulse(C.success)
+        elif background:
+            names = ", ".join(
+                a.get("display_name", a["name"]) for a in background[:5])
+            self._live_name.setText(f"В фоне: {len(background)}")
+            self._live_detail.setText(names)
+            self._live_timer.setText("—")
+            self._tint_pulse(C.text_dim)
+        else:
+            self._live_name.setText("Ожидание…")
+            self._live_detail.setText("Нет запущенных отслеживаемых приложений")
             self._live_timer.setText("—")
             self._tint_pulse(C.text_dim)
 
@@ -132,12 +130,15 @@ class DashboardView(QWidget):
         cards_row.setSpacing(S.md)
         self.card_total = StatCard("Всего сегодня", C.accent)
         self.card_active = StatCard("Активное время", C.success)
-        self.card_running = StatCard("Запущено сейчас", C.warning)
+        self.card_background = StatCard("Фоновое время", C.warning)
+        self.card_running = StatCard("Запущено сейчас", C.text_muted)
         self.card_top = StatCard("Топ приложение", C.text)
         for i, card in enumerate(
-            [self.card_total, self.card_active, self.card_running, self.card_top]
+            [self.card_total, self.card_active, self.card_background]
         ):
             cards_row.addWidget(card, 0, i)
+        for i, card in enumerate([self.card_running, self.card_top]):
+            cards_row.addWidget(card, 1, i)
         root.addLayout(cards_row)
 
         period_row = QHBoxLayout()
@@ -201,9 +202,6 @@ class DashboardView(QWidget):
     def _on_period_change(self):
         self.refresh()
 
-    def refresh_live_only(self):
-        self._update_cards(self._stats)
-
     def _update_contents(self, stats):
         self._chart_container.set_stats(stats)
         self._update_cards(stats)
@@ -212,10 +210,15 @@ class DashboardView(QWidget):
     def _update_cards(self, stats):
         total = sum(s.active_seconds + s.background_seconds for s in stats)
         active = sum(s.active_seconds for s in stats)
-        self.card_total.set_value(_fmt(total))
+        background = total - active
+        self.card_total.set_value(fmt_duration(total))
         self.card_active.set_value(
-            _fmt(active),
-            f"{int(active / total * 100) if total else 0}% от общего",
+            fmt_duration(active),
+            f"{int(active / total * 100) if total else 0}%",
+        )
+        self.card_background.set_value(
+            fmt_duration(background),
+            f"{int(background / total * 100) if total else 0}%",
         )
         running = len([s for s in stats if s.active_seconds + s.background_seconds > 0])
         self.card_running.set_value(str(running))
@@ -227,7 +230,7 @@ class DashboardView(QWidget):
         if top and (top.active_seconds + top.background_seconds) > 0:
             self.card_top.set_value(
                 top.display_name or top.process_name,
-                _fmt(top.active_seconds + top.background_seconds),
+                fmt_duration(top.active_seconds + top.background_seconds),
             )
 
     def _update_table(self, stats):
@@ -247,8 +250,8 @@ class DashboardView(QWidget):
             self._table.setItem(i, 0, name_item)
 
             for col, val, raw in [
-                (1, _fmt(s.active_seconds), s.active_seconds),
-                (2, _fmt(s.background_seconds), s.background_seconds),
+                (1, fmt_duration(s.active_seconds), s.active_seconds),
+                (2, fmt_duration(s.background_seconds), s.background_seconds),
                 (3, str(s.session_count), s.session_count),
             ]:
                 item = NumericItem(val)

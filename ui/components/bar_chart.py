@@ -1,7 +1,8 @@
 from PySide6.QtWidgets import QWidget, QScrollArea
 from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QPainter, QColor, QPalette
+from PySide6.QtGui import QPainter, QColor
 from ui.theme import PALETTE as C
+from utils.format import fmt_duration
 
 
 class BarChartWidget(QWidget):
@@ -65,8 +66,7 @@ class BarChartWidget(QWidget):
                 painter.setPen(Qt.PenStyle.NoPen)
                 painter.drawRoundedRect(bx + a_w, y, b_w, bar_h, radius, radius)
 
-            from ui.theme import _fmt
-            label = _fmt(total_sec)
+            label = fmt_duration(total_sec)
             painter.setPen(text_color)
             painter.drawText(bx + a_w + b_w + self._gap, y, self._right - 4, bar_h,
                              Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight, label)

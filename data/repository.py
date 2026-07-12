@@ -71,19 +71,6 @@ class Repository:
             )
         self.db.commit()
 
-    def get_open_session(self, app_id: int) -> Optional[Session]:
-        row = self.db.execute(
-            "SELECT * FROM sessions WHERE app_id = ? AND end_time IS NULL ORDER BY start_time DESC LIMIT 1",
-            (app_id,),
-        ).fetchone()
-        return Session(**dict(row)) if row else None
-
-    def get_all_open_sessions(self) -> List[Session]:
-        rows = self.db.execute(
-            "SELECT * FROM sessions WHERE end_time IS NULL ORDER BY start_time"
-        ).fetchall()
-        return [Session(**dict(r)) for r in rows]
-
     def close_all_active_sessions(self):
         self.db.execute(
             "UPDATE sessions SET end_time = ?, duration_sec = COALESCE(active_sec,0) + COALESCE(background_sec,0) WHERE end_time IS NULL",
@@ -92,51 +79,29 @@ class Repository:
         self.db.commit()
 
     def get_stats(self, period_days: int = 1) -> List[AppStats]:
+        time_filter = ""
+        params = ()
         if period_days is None:
-            query = """
-                SELECT w.process_name, w.display_name,
-                       COALESCE(SUM(s.duration_sec), 0) as total_seconds,
-                       COALESCE(SUM(s.active_sec), 0) as active_seconds,
-                       COALESCE(SUM(s.background_sec), 0) as background_seconds,
-                       COUNT(s.id) as session_count
-                FROM watched_apps w
-                LEFT JOIN sessions s ON s.app_id = w.id
-                    AND s.duration_sec IS NOT NULL
-                GROUP BY w.id
-                ORDER BY total_seconds DESC
-            """
-            rows = self.db.execute(query).fetchall()
+            pass
         elif period_days == 1:
-            query = """
-                SELECT w.process_name, w.display_name,
-                       COALESCE(SUM(s.duration_sec), 0) as total_seconds,
-                       COALESCE(SUM(s.active_sec), 0) as active_seconds,
-                       COALESCE(SUM(s.background_sec), 0) as background_seconds,
-                       COUNT(s.id) as session_count
-                FROM watched_apps w
-                LEFT JOIN sessions s ON s.app_id = w.id
-                    AND s.start_time >= datetime('now', 'localtime', 'start of day')
-                    AND s.duration_sec IS NOT NULL
-                GROUP BY w.id
-                ORDER BY total_seconds DESC
-            """
-            rows = self.db.execute(query).fetchall()
+            time_filter = "AND s.start_time >= datetime('now', 'localtime', 'start of day')"
         else:
             days_offset = period_days - 1
-            query = """
-                SELECT w.process_name, w.display_name,
-                       COALESCE(SUM(s.duration_sec), 0) as total_seconds,
-                       COALESCE(SUM(s.active_sec), 0) as active_seconds,
-                       COALESCE(SUM(s.background_sec), 0) as background_seconds,
-                       COUNT(s.id) as session_count
-                FROM watched_apps w
-                LEFT JOIN sessions s ON s.app_id = w.id
-                    AND s.start_time >= datetime('now', 'localtime', 'start of day', ?)
-                    AND s.duration_sec IS NOT NULL
-                GROUP BY w.id
-                ORDER BY total_seconds DESC
-            """
-            rows = self.db.execute(query, (f"-{days_offset} days",)).fetchall()
+            time_filter = "AND s.start_time >= datetime('now', 'localtime', 'start of day', ?)"
+            params = (f"-{days_offset} days",)
+
+        query = f"""
+            SELECT w.process_name, w.display_name,
+                   COALESCE(SUM(s.active_sec), 0) as active_seconds,
+                   COALESCE(SUM(s.background_sec), 0) as background_seconds,
+                   COUNT(s.id) as session_count
+            FROM watched_apps w
+            LEFT JOIN sessions s ON s.app_id = w.id
+                {time_filter}
+            GROUP BY w.id
+            ORDER BY active_seconds + background_seconds DESC
+        """
+        rows = self.db.execute(query, params).fetchall()
         return [AppStats(**dict(r)) for r in rows]
 
     def get_today_seconds_by_app(self) -> dict:

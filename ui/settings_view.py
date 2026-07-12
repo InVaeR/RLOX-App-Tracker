@@ -1,31 +1,44 @@
+import webbrowser
+
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QSpinBox, QDoubleSpinBox,
     QCheckBox, QPushButton, QMessageBox, QGroupBox, QLabel,
+    QScrollArea,
 )
-from PySide6.QtCore import Qt
-
 from services.config_manager import ConfigManager
 from services.autostart import enable_autostart, disable_autostart, is_autostart_enabled
+from services.updater import check_for_update
 from data.repository import Repository
+from version import __version__
 from config import DEFAULT_IDLE_THRESHOLD, DEFAULT_POLL_INTERVAL, DEFAULT_SAVE_TITLES, DEFAULT_MINIMIZE_TO_TRAY
 from ui.theme import PALETTE as C
 
 
 class SettingsView(QWidget):
     def __init__(self, config: ConfigManager, repo: Repository = None,
-                 on_settings_changed=None, parent=None):
+                 on_settings_changed=None, on_data_cleared=None, parent=None):
         super().__init__(parent)
         self.config = config
         self._repo = repo
         self._on_settings_changed = on_settings_changed
+        self._on_data_cleared = on_data_cleared
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
 
         title = QLabel("Настройки")
         title.setStyleSheet("font-size:20px; font-weight:700;")
-        layout.addWidget(title)
+        title.setContentsMargins(24, 16, 24, 0)
+        outer.addWidget(title)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(24, 16, 24, 24)
+        layout.setSpacing(16)
 
         tracking = self._group("Трекинг")
         tf = QFormLayout(tracking)
@@ -77,7 +90,32 @@ class SettingsView(QWidget):
         dl.addWidget(btn_clear)
         layout.addWidget(danger)
 
+        about = self._group(f"О программе — v{__version__}")
+        al = QVBoxLayout(about)
+        btn_update = QPushButton("Проверить обновления")
+        btn_update.clicked.connect(self._check_update)
+        al.addWidget(btn_update)
+        layout.addWidget(about)
+
         layout.addStretch()
+
+        scroll.setWidget(content)
+        outer.addWidget(scroll)
+
+    def _check_update(self):
+        info = check_for_update()
+        if info:
+            msg = f"Доступна версия {info.version}."
+            if info.notes:
+                msg += f"\n\n{info.notes[:500]}"
+            r = QMessageBox.information(
+                self, "Обновление", msg,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if r == QMessageBox.StandardButton.Yes:
+                webbrowser.open(info.url)
+        else:
+            QMessageBox.information(self, "Обновление",
+                                   "У вас последняя версия.")
 
     def _group(self, title):
         box = QGroupBox(title)
@@ -102,6 +140,9 @@ class SettingsView(QWidget):
             "Вы уверены? Все данные о сессиях и приложениях будут удалены безвозвратно.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
-        if reply == QMessageBox.StandardButton.Yes and self._repo:
-            self._repo.clear_all_data()
+        if reply == QMessageBox.StandardButton.Yes:
+            if self._on_data_cleared:
+                self._on_data_cleared()
+            elif self._repo:
+                self._repo.clear_all_data()
             QMessageBox.information(self, "Очистка", "Все данные удалены.")

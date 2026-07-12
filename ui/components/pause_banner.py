@@ -13,7 +13,7 @@ class PauseBanner(QFrame):
                 background-color: {C.warning};
                 border-radius: 0;
             }}
-            QLabel {{ color: #1a1200; font-weight: 600; font-size: 13px; }}
+            QLabel {{ color: {C.text}; font-weight: 600; font-size: 13px; }}
         """)
         lay = QHBoxLayout(self)
         lay.setContentsMargins(16, 8, 16, 8)
@@ -21,7 +21,7 @@ class PauseBanner(QFrame):
         lay.addStretch()
         btn = QPushButton("Возобновить")
         btn.setStyleSheet(
-            "background:#1a1200; color:#fff; border:none; "
+            f"background:{C.text}; color:{C.surface}; border:none; "
             "border-radius:6px; padding:6px 14px;"
         )
         btn.setCursor(Qt.CursorShape.PointingHandCursor)

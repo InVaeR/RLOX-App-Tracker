@@ -1,8 +1,11 @@
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
 from config import CONFIG_PATH
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigManager:
@@ -21,13 +24,14 @@ class ConfigManager:
                 self._path.write_text(old.read_text(encoding="utf-8"), encoding="utf-8")
                 old.unlink()
             except OSError:
-                pass
+                logger.warning("Migration failed", exc_info=True)
 
     def _load(self):
         if self._path.exists():
             try:
                 self._data = json.loads(self._path.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
+                logger.warning("Config load failed", exc_info=True)
                 self._data = {}
         else:
             self._data = {}

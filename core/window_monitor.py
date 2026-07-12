@@ -1,8 +1,11 @@
+import logging
 from typing import Optional, Dict
 
 import win32gui
 import win32process
 import psutil
+
+logger = logging.getLogger(__name__)
 
 
 def get_active_window_process() -> Optional[Dict]:
@@ -19,4 +22,7 @@ def get_active_window_process() -> Optional[Dict]:
             "title": win32gui.GetWindowText(hwnd),
         }
     except (psutil.NoSuchProcess, psutil.AccessDenied):
+        return None
+    except Exception:
+        logger.exception("get_active_window_process")
         return None

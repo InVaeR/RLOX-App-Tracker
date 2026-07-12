@@ -23,6 +23,24 @@ class _SessionState:
     _acc: float = 0.0
 
 
+@dataclass
+class _TickContext:
+    now: datetime
+    delta: int
+    slept: bool
+    idle_now: float
+    focused_name: Optional[str]
+    focused_app_id: Optional[int]
+    focused_display: str
+    focused_sec: int
+    running_names: set
+    watched_apps: List[WatchedApp]
+    watched_ids: Dict[int, WatchedApp]
+    watched_running: List[dict]
+    background_apps: List[dict]
+    window: Optional[dict]
+
+
 class TrackerService(QObject):
     tracking_paused = Signal()
     tracking_resumed = Signal()
@@ -48,11 +66,13 @@ class TrackerService(QObject):
         self._load_settings()
 
     def _load_settings(self):
-        self._poll_interval = self.config.get_float("poll_interval", DEFAULT_POLL_INTERVAL)
+        self._poll_interval = max(0.5, min(10.0, self.config.get_float("poll_interval", DEFAULT_POLL_INTERVAL)))
         self._idle_threshold = self.config.get_int("idle_threshold", DEFAULT_IDLE_THRESHOLD)
         self._save_titles = self.config.get_bool("save_window_titles", True)
 
     def start(self):
+        self.repo.close_all_active_sessions()
+        self._sessions.clear()
         self._running = True
         self._paused = False
         self._last_tick_time = datetime.now()
@@ -94,13 +114,7 @@ class TrackerService(QObject):
             self._cache_dirty = False
         return self._watched_cache
 
-    def _tick(self):
-        if self._paused:
-            return
-
-        self._tick_count += 1
-        now = datetime.now()
-
+    def _compute_delta(self, now: datetime) -> tuple:
         slept = False
         delta = self._poll_interval
         if self._last_tick_time is not None:
@@ -112,54 +126,15 @@ class TrackerService(QObject):
             else:
                 delta = min(elapsed, self._poll_interval * 2)
         self._last_tick_time = now
+        return delta, slept
 
-        if slept:
-            self._close_all_sessions()
-
+    def _collect_context(self, now: datetime, delta: int, slept: bool) -> _TickContext:
         idle_now = get_idle_seconds()
         window = get_active_window_process()
         focused_name = window["name"] if window else None
         running_names = get_running_process_names()
         watched_apps = self._get_watched_apps()
         watched_ids = {a.id: a for a in watched_apps if a.id}
-
-        for app in watched_apps:
-            if app.id is None:
-                continue
-            is_running = app.process_name in running_names
-            is_focused = focused_name == app.process_name
-            state = self._sessions.get(app.id)
-
-            if not is_running:
-                if state:
-                    self._close_session(app.id, state)
-                continue
-
-            if not state:
-                title = window["title"] if is_focused and self._save_titles else ""
-                sess = Session(app_id=app.id, start_time=now, window_title=title)
-                sid = self.repo.add_session(sess)
-                self._sessions[app.id] = _SessionState(session_id=sid, start_time=now, title=title)
-
-            state = self._sessions[app.id]
-            delta_int = int(delta)
-            state._acc += delta - delta_int
-            if state._acc >= 1.0:
-                extra = int(state._acc)
-                delta_int += extra
-                state._acc -= extra
-
-            if delta_int > 0:
-                if is_focused and idle_now <= self._idle_threshold:
-                    state.active_sec += delta_int
-                    if self._save_titles and window:
-                        state.title = window["title"]
-                else:
-                    state.background_sec += delta_int
-
-        for app_id, state in list(self._sessions.items()):
-            if app_id not in watched_ids:
-                self._close_session(app_id, state)
 
         watched_running = [
             {"name": a.process_name, "display_name": a.display_name or a.process_name}
@@ -176,17 +151,101 @@ class TrackerService(QObject):
         if focused_app_id and focused_app_id in self._sessions:
             state = self._sessions[focused_app_id]
             focused_sec = state.active_sec
+
+        focused_set = {focused_name} if focused_app_id is not None else set()
+        background_apps = [
+            {"name": a.process_name, "display_name": a.display_name or a.process_name}
+            for a in watched_apps
+            if a.process_name in running_names and a.process_name not in focused_set
+        ]
+
+        return _TickContext(
+            now=now, delta=delta, slept=slept,
+            idle_now=idle_now, focused_name=focused_name,
+            focused_app_id=focused_app_id, focused_display=focused_display,
+            focused_sec=focused_sec, running_names=running_names,
+            watched_apps=watched_apps, watched_ids=watched_ids,
+            watched_running=watched_running, background_apps=background_apps,
+            window=window,
+        )
+
+    def _update_sessions(self, ctx: _TickContext):
+        for app in ctx.watched_apps:
+            if app.id is None:
+                continue
+            is_running = app.process_name in ctx.running_names
+            is_focused = ctx.focused_name == app.process_name
+            state = self._sessions.get(app.id)
+
+            if not is_running:
+                if state:
+                    self._close_session(app.id, state)
+                continue
+
+            if not state:
+                title = ctx.window["title"] if is_focused and self._save_titles else ""
+                sess = Session(app_id=app.id, start_time=ctx.now, window_title=title)
+                sid = self.repo.add_session(sess)
+                self._sessions[app.id] = _SessionState(
+                    session_id=sid, start_time=ctx.now, title=title)
+
+            state = self._sessions[app.id]
+            delta_int = int(ctx.delta)
+            state._acc += ctx.delta - delta_int
+            if state._acc >= 1.0:
+                extra = int(state._acc)
+                delta_int += extra
+                state._acc -= extra
+
+            if delta_int > 0:
+                if is_focused and ctx.idle_now <= self._idle_threshold:
+                    state.active_sec += delta_int
+                    if self._save_titles and ctx.window:
+                        state.title = ctx.window["title"]
+                else:
+                    state.background_sec += delta_int
+
+    def _cleanup_orphan_sessions(self, ctx: _TickContext):
+        for app_id, state in list(self._sessions.items()):
+            if app_id not in ctx.watched_ids:
+                self._close_session(app_id, state)
+
+    def _emit_live_info(self, ctx: _TickContext):
         self.active_app_info.emit({
             "paused": self._paused,
-            "running_apps": watched_running,
-            "focused": focused_name,
-            "focused_display": focused_display,
-            "focused_sec": focused_sec,
+            "running_apps": ctx.watched_running,
+            "background_apps": ctx.background_apps,
+            "focused": ctx.focused_name if ctx.focused_app_id is not None else None,
+            "focused_display": ctx.focused_display,
+            "focused_sec": ctx.focused_sec,
         })
 
+    def _tick(self):
+        if self._paused:
+            return
+
+        self._tick_count += 1
+        now = datetime.now()
+
+        delta, slept = self._compute_delta(now)
+
+        if slept:
+            self._close_all_sessions()
+
+        ctx = self._collect_context(now, delta, slept)
+        self._update_sessions(ctx)
+        self._cleanup_orphan_sessions(ctx)
+        self._emit_live_info(ctx)
         self._periodic_flush()
 
-    def _close_session(self, app_id: int, state: _SessionState):
+    def reset_all(self, emit=True):
+        self._sessions.clear()
+        self._cache_dirty = True
+        self._watched_cache = []
+        if emit:
+            self.stats_updated.emit()
+
+    def _close_session(self, app_id: int, state: _SessionState, emit=True):
         now = datetime.now()
         elapsed = int((now - state.start_time).total_seconds())
         active = min(state.active_sec, elapsed)
@@ -201,17 +260,19 @@ class TrackerService(QObject):
         )
         self.repo.update_session(sess)
         del self._sessions[app_id]
-        self.stats_updated.emit()
+        if emit:
+            self.stats_updated.emit()
 
     def _close_all_sessions(self):
         for app_id, state in list(self._sessions.items()):
-            self._close_session(app_id, state)
+            self._close_session(app_id, state, emit=False)
+        self.stats_updated.emit()
 
     def _periodic_flush(self):
         if self._tick_count % 10 != 0:
             return
+        now = datetime.now()
         for app_id, state in self._sessions.items():
-            now = datetime.now()
             elapsed = int((now - state.start_time).total_seconds())
             active = min(state.active_sec, elapsed)
             background = min(state.background_sec, elapsed - active)

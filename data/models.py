@@ -22,14 +22,12 @@ class Session:
     duration_sec: Optional[int] = None
     active_sec: Optional[int] = 0
     background_sec: Optional[int] = 0
-    idle_sec: Optional[int] = 0
 
 
 @dataclass
 class AppStats:
     process_name: str
     display_name: str
-    total_seconds: int
     active_seconds: int
     background_seconds: int
     session_count: int

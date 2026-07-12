@@ -1,16 +1,18 @@
 import sys
 import winreg
 
+from version import __app_name__
+
 REG_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 
 
-def enable_autostart(app_name: str = "RusLOXPy"):
+def enable_autostart(app_name: str = __app_name__):
     path = sys.executable
     with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_KEY, 0, winreg.KEY_SET_VALUE) as k:
         winreg.SetValueEx(k, app_name, 0, winreg.REG_SZ, f'"{path}"')
 
 
-def disable_autostart(app_name: str = "RusLOXPy"):
+def disable_autostart(app_name: str = __app_name__):
     with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_KEY, 0, winreg.KEY_SET_VALUE) as k:
         try:
             winreg.DeleteValue(k, app_name)
@@ -18,7 +20,7 @@ def disable_autostart(app_name: str = "RusLOXPy"):
             pass
 
 
-def is_autostart_enabled(app_name: str = "RusLOXPy") -> bool:
+def is_autostart_enabled(app_name: str = __app_name__) -> bool:
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_KEY, 0, winreg.KEY_READ) as k:
             winreg.QueryValueEx(k, app_name)

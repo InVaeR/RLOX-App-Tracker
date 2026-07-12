@@ -6,16 +6,16 @@ from PySide6.QtWidgets import (
     QListWidgetItem, QDialogButtonBox, QFileDialog, QLabel, QLineEdit,
     QStackedWidget, QMenu, QInputDialog,
 )
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction
+from pathlib import Path
 
+from PySide6.QtCore import Qt
 from services.watchlist import WatchListManager
 from data.repository import Repository
 from core.process_scanner import list_running_apps
 from ui.components.empty_state import EmptyState
-from ui.components.app_icons import get_app_icon
+from ui.components.app_icons import get_app_icon, asset_pixmap
 from ui.components.app_item_delegate import AppItemDelegate
-from ui.theme import _fmt
+from utils.format import fmt_duration
 
 
 class AddAppDialog(QDialog):
@@ -74,8 +74,7 @@ class AddAppDialog(QDialog):
             self, "Выберите исполняемый файл", "", "Executable (*.exe)"
         )
         if path:
-            name = path.rsplit("\\", 1)[-1]
-            self._selected_name = name
+            self._selected_name = Path(path).name
             self._selected_exe = path
             self.accept()
 
@@ -94,8 +93,6 @@ class WatchListView(QWidget):
         self.manager = watchlist_manager
         self._repo = repo
         self._on_changed = on_changed
-        self._current_sort_col = -1
-        self._current_sort_order = Qt.SortOrder.AscendingOrder
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
@@ -107,7 +104,6 @@ class WatchListView(QWidget):
 
         self._content_stack = QStackedWidget()
 
-        from ui.components.app_icons import asset_pixmap
         self._empty = EmptyState(
             "Список пуст",
             "Добавьте приложения, время которых хотите отслеживать",
@@ -180,9 +176,7 @@ class WatchListView(QWidget):
                 self.table.setItem(i, col, item)
 
             sec = today_map.get(app.process_name, 0)
-            h, m = sec // 3600, (sec % 3600) // 60
-            time_text = f"{h} ч {m} мин" if h else f"{m} мин"
-            time_item = QTableWidgetItem(time_text)
+            time_item = QTableWidgetItem(fmt_duration(sec, short=True))
             time_item.setData(Qt.ItemDataRole.UserRole, sec)
             time_item.setFlags(
                 time_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
@@ -199,9 +193,7 @@ class WatchListView(QWidget):
             if not proc_item:
                 continue
             sec = today.get(proc_item.text(), 0)
-            h, m = sec // 3600, (sec % 3600) // 60
-            time_text = f"{h} ч {m} мин" if h else f"{m} мин"
-            self.table.item(row, 3).setText(time_text)
+            self.table.item(row, 3).setText(fmt_duration(sec, short=True))
             self.table.item(row, 3).setData(Qt.ItemDataRole.UserRole, sec)
 
     def _on_add(self):
@@ -225,7 +217,7 @@ class WatchListView(QWidget):
         self._remove_row(row)
 
     def _remove_row(self, row):
-        app_id = self.table.item(row, 0).data(Qt.UserRole)
+        app_id = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
         reply = QMessageBox.question(
             self, "Подтверждение",
             "Удалить приложение и всю статистику по нему?",
@@ -238,7 +230,7 @@ class WatchListView(QWidget):
             self.refresh()
 
     def _rename_row(self, row):
-        app_id = self.table.item(row, 0).data(Qt.UserRole)
+        app_id = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
         current = self.table.item(row, 0).text()
         new, ok = QInputDialog.getText(
             self, "Переименовать",

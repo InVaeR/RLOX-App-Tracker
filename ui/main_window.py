@@ -54,7 +54,9 @@ class MainWindow(QMainWindow):
         self.dashboard_view = DashboardView(reporter, on_add_app=self._show_apps)
         self.watchlist_view = WatchListView(watchlist_mgr, repo,
                                             on_changed=self.tracker.invalidate_cache)
-        self.settings_view = SettingsView(config, repo, on_settings_changed=self._on_settings_changed)
+        self.settings_view = SettingsView(config, repo,
+            on_settings_changed=self._on_settings_changed,
+            on_data_cleared=self._on_data_cleared)
 
         root = QWidget()
         root.setObjectName("root")
@@ -137,6 +139,15 @@ class MainWindow(QMainWindow):
         self.btn_apps.setChecked(True)
         self.stack.setCurrentIndex(1)
 
+    def _on_data_cleared(self):
+        self.tracker.reset_all(emit=False)
+        self.repo.clear_all_data()
+        self.dashboard_view.refresh()
+        self.dashboard_view.update_live({"paused": self.tracker.is_paused,
+                                         "running_apps": [], "focused": None,
+                                         "focused_display": "", "focused_sec": 0})
+        self.watchlist_view.refresh()
+
     def _on_settings_changed(self):
         self.tracker.update_settings()
 
@@ -218,6 +229,8 @@ class MainWindow(QMainWindow):
             return
         self._closing = True
         self.tracker.stop()
+        if getattr(self, "db", None):
+            self.db.close()
         self.tray_icon.hide()
         QApplication.quit()
 
