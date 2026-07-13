@@ -124,10 +124,10 @@ internal readonly struct SemVersion : IComparable<SemVersion>, IEquatable<SemVer
 
     public bool Equals(SemVersion other) =>
         Major == other.Major && Minor == other.Minor && Patch == other.Patch &&
-        PreRelease == other.PreRelease && Build == other.Build;
+        PreRelease == other.PreRelease;
 
     public override bool Equals(object? obj) => obj is SemVersion other && Equals(other);
-    public override int GetHashCode() => HashCode.Combine(Major, Minor, Patch, PreRelease, Build);
+    public override int GetHashCode() => HashCode.Combine(Major, Minor, Patch, PreRelease);
 
     public override string ToString()
     {

@@ -74,6 +74,16 @@ public class SemVersionTests
         Assert.True(SemVersion.Parse("2.0.0-beta.10") > SemVersion.Parse("2.0.0-beta.2"));
     }
 
+    [Fact]
+    public void BuildMetadata_DoesNotAffectPrecedenceOrEquality()
+    {
+        var a = SemVersion.Parse("2.0.0+build1");
+        var b = SemVersion.Parse("2.0.0+build2");
+
+        Assert.Equal(0, a.CompareTo(b));
+        Assert.Equal(a, b);
+    }
+
     [Theory]
     [InlineData("2.0.10", "2.0.9", true)]
     [InlineData("2.0.9", "2.0.10", false)]

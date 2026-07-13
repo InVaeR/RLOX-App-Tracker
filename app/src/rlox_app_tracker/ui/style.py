@@ -87,10 +87,10 @@ QPushButton:hover {{
 QPushButton#primary {{
     background-color: {C.accent};
     border: none;
-    color: white;
+    color: #1a3a2f;
     font-weight: 600;
 }}
-QPushButton#primary:hover {{ background-color: {C.accent_hover}; }}
+QPushButton#primary:hover {{ background-color: {C.accent_hover}; color: #1a3a2f; }}
 QPushButton#danger {{
     background-color: transparent;
     border: 1px solid {C.danger};
@@ -118,17 +118,7 @@ QComboBox QAbstractItemView {{
     padding: 4px;
 }}
 
-QCheckBox {{ spacing: 8px; font-size: 13px; }}
-QCheckBox::indicator {{
-    width: 20px; height: 20px;
-    border-radius: {R.sm}px;
-    border: 1px solid {C.border};
-    background: {C.bg};
-}}
-QCheckBox::indicator:checked {{
-    background-color: {C.accent};
-    border-color: {C.accent};
-}}
+QCheckBox {{ spacing: 8px; font-size: 13px; color: {C.text}; }}
 
 QGroupBox {{
     border: 1px solid {C.border};

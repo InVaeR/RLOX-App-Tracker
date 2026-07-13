@@ -45,4 +45,34 @@ jobs:
       - name: Run launcher tests
         run: dotnet test launcher/tests/RLOXLauncher.Tests.csproj --verbosity normal
       - name: Build app (PyInstaller)
-        run: pyinstaller app/RLOXAppTracker.spec --noconfirm
+        run: pyinstaller app/RLOXAppTracker.spec --clean --noconfirm
+
+      - name: Publish launcher
+        run: |
+          dotnet publish launcher/src/RLOXLauncher/RLOXLauncher.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --output dist/launcher `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Compile installer
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+
+          if (-not (Test-Path $iscc)) {
+            throw "ISCC.exe not found"
+          }
+
+          & $iscc `
+            "/DAppVersion=2.0.0-alpha.1" `
+            "/DAppVersionNumeric=2.0.0.1" `
+            "installer/RLOXAppTracker.iss"
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup failed with exit code $LASTEXITCODE"
+          }

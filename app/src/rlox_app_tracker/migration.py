@@ -52,17 +52,21 @@ def _copy_db(old_path: Path) -> bool:
             if src.exists():
                 shutil.copy2(str(src), str(db_dir / (DB_PATH.name + ext)))
 
-        # Verify the copy — quick integrity check
+        # Verify the copy — integrity check
         try:
-            verify = sqlite3.connect(str(DB_PATH))
-            result = verify.execute("PRAGMA integrity_check").fetchone()
-            verify.close()
-            if result and result[0] == "ok":
-                logger.info("Целостность БД подтверждена")
-            else:
-                logger.warning("Проверка целостности: %s", result)
-        except Exception as e:
-            logger.warning("Проверка целостности не удалась (некритично): %s", e)
+            with sqlite3.connect(str(DB_PATH)) as verify:
+                result = verify.execute("PRAGMA integrity_check").fetchone()
+
+            if not result or result[0] != "ok":
+                logger.error("Мигрированная БД повреждена: %s", result)
+                DB_PATH.unlink(missing_ok=True)
+                return False
+
+            logger.info("Целостность БД подтверждена")
+        except (sqlite3.Error, OSError) as e:
+            logger.error("Проверка целостности мигрированной БД не удалась: %s", e)
+            DB_PATH.unlink(missing_ok=True)
+            return False
 
         logger.info("БД мигрирована: %s -> %s", old_path, DB_PATH)
         return True
@@ -109,7 +113,12 @@ def _write_marker(success: bool, details: str = ""):
 
 def needs_migration() -> bool:
     if MIGRATION_MARKER.exists():
-        return False
+        try:
+            marker = json.loads(MIGRATION_MARKER.read_text(encoding="utf-8"))
+            if marker.get("result") == "success":
+                return False
+        except (OSError, json.JSONDecodeError):
+            logger.warning("Не удалось прочитать migration marker", exc_info=True)
     if DB_PATH.exists():
         return False
     return OLD_APPDATA.exists() and _get_old_db_path() is not None
@@ -118,8 +127,13 @@ def needs_migration() -> bool:
 def migrate() -> bool:
     logger.info("Начало миграции из RusLOXPy")
     if MIGRATION_MARKER.exists():
-        logger.info("Миграция уже выполнена")
-        return True
+        try:
+            marker = json.loads(MIGRATION_MARKER.read_text(encoding="utf-8"))
+            if marker.get("result") == "success":
+                logger.info("Миграция уже выполнена")
+                return True
+        except (OSError, json.JSONDecodeError):
+            pass
     if DB_PATH.exists():
         logger.info("Новая БД уже существует, пропускаем миграцию")
         _write_marker(True, "skipped: new db already exists")

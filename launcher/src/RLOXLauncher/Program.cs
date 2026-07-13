@@ -5,7 +5,9 @@ namespace RLOXLauncher;
 internal class Program
 {
     internal const string AppVersion = "2.0.0";
-    private const string ManifestUrl = "https://github.com/InVaeR/RLOX-App-Tracker/releases/latest/download/latest.json";
+    private const string ManifestBaseUrl = "https://github.com/InVaeR/RLOX-App-Tracker/releases/latest/download";
+
+    private static string GetManifestUrl(string channel) => $"{ManifestBaseUrl}/{channel}.json";
 
     private static void Main(string[] args)
     {
@@ -83,14 +85,17 @@ internal class Program
             }
         }
 
-        // Clean up old versions (keep only effective + previous)
-        if (installState.IsValid())
+        // Clean up old versions (keep current + pending + previous)
+        // Only when update is confirmed (no pending startup)
+        if (installState.IsValid()
+            && installState.PendingVersion == null
+            && installState.StartupConfirmed)
         {
             CleanupOldVersions(installState);
         }
         else
         {
-            Logger.Warn("Install state is invalid — skipping cleanup to prevent data loss");
+            Logger.Info("Version cleanup skipped: install state is invalid or update is not confirmed");
         }
 
         // --launch or default: if app already running, just activate it
@@ -115,7 +120,7 @@ internal class Program
         if (shouldCheck)
         {
             Logger.Info("Checking for updates...");
-            var manifest = await UpdateClient.FetchManifestAsync(ManifestUrl);
+            var manifest = await UpdateClient.FetchManifestAsync(GetManifestUrl(config.Channel));
 
             if (manifest != null)
             {
@@ -162,6 +167,7 @@ internal class Program
                         if (!success)
                         {
                             Logger.Warn("Update failed — will launch current version if applicable");
+                            CancelPendingUpdate(installState);
                         }
                         else
                         {
@@ -257,6 +263,22 @@ internal class Program
         }
     }
 
+    private static void CancelPendingUpdate(InstallState installState)
+    {
+        installState.PendingVersion = null;
+        installState.LaunchAttemptedAt = null;
+        installState.StartupConfirmed = true;
+
+        if (!string.IsNullOrWhiteSpace(installState.CurrentVersion))
+        {
+            installState.AppExecutable =
+                $"versions\\{installState.CurrentVersion}\\RLOXAppTracker.exe";
+        }
+
+        installState.Save(AppPaths.InstallJsonPath);
+        Logger.Info("Cancelled pending update — state reverted to current version");
+    }
+
     /// <summary>
     /// Checks if the pending version has failed (startup marker absent after launch attempt).
     /// If so, reverts to the former current version.
@@ -280,6 +302,17 @@ internal class Program
             installState.AppExecutable = $"versions\\{installState.CurrentVersion}\\RLOXAppTracker.exe";
             installState.Save(AppPaths.InstallJsonPath);
             return false;
+        }
+
+        // Grace period: don't rollback within first 60 seconds
+        if (DateTimeOffset.TryParse(installState.LaunchAttemptedAt, out var attemptedAt))
+        {
+            var elapsed = DateTimeOffset.Now - attemptedAt;
+            if (elapsed < TimeSpan.FromSeconds(60))
+            {
+                Logger.Info($"Pending version {pending} is still within startup grace period ({elapsed.TotalSeconds:F0}s)");
+                return false;
+            }
         }
 
         Logger.Warn($"Pending version {pending} launched but startup marker absent — possible crash");
@@ -308,8 +341,10 @@ internal class Program
         if (!Directory.Exists(versionsDir)) return;
 
         var keep = new HashSet<string>();
-        if (installState.EffectiveVersion != null)
-            keep.Add(installState.EffectiveVersion);
+        if (!string.IsNullOrWhiteSpace(installState.CurrentVersion))
+            keep.Add(installState.CurrentVersion);
+        if (!string.IsNullOrWhiteSpace(installState.PendingVersion))
+            keep.Add(installState.PendingVersion);
         if (installState.PreviousVersion != null)
             keep.Add(installState.PreviousVersion);
 

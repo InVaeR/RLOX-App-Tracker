@@ -36,6 +36,7 @@ class BarChartWidget(QWidget):
         bar_h = max(24, min(36, (h - 16) // count))
         total = max(s.active_seconds + s.background_seconds for s in self._stats)
         if total == 0:
+            painter.end()
             return
         active_color = QColor(C.accent)
         bg_color = QColor(C.background_bar)

@@ -51,7 +51,6 @@ class SingleInstance(QObject):
             return "already_running"
         QLocalServer.removeServer(self._key)
         server = QLocalServer()
-        server.setSocketOptions(QLocalServer.SocketOption.WorldAccessOption)
         if not server.listen(self._key):
             logger.error("Не удалось занять singleton-сокет: %s", server.errorString())
             return "error"
@@ -63,20 +62,24 @@ class SingleInstance(QObject):
         sock = self._server.nextPendingConnection()
         if not sock:
             return
-        if sock.waitForReadyRead(1000):
-            data = sock.readAll().data().decode("utf-8", errors="replace").strip()
-            logger.info("IPC команда: %s", data)
-            if data == "show" and self._on_show:
-                self._on_show()
-            elif data == "shutdown" and self._on_shutdown:
-                self._on_shutdown()
-            elif data == "shutdown-for-update" and self._on_shutdown:
-                self._on_shutdown()
-            elif data == "ping":
-                sock.write(b"pong\n")
-                sock.waitForBytesWritten(200)
+        sock.readyRead.connect(lambda: self._handle_ipc(sock))
+        sock.disconnected.connect(sock.deleteLater)
+
+    def _handle_ipc(self, sock: QLocalSocket):
+        data = sock.readAll().data().decode("utf-8", errors="replace").strip()
+        if not data:
+            return
+        logger.info("IPC команда: %s", data)
+        if data == "show" and self._on_show:
+            self._on_show()
+        elif data == "shutdown" and self._on_shutdown:
+            self._on_shutdown()
+        elif data == "shutdown-for-update" and self._on_shutdown:
+            self._on_shutdown()
+        elif data == "ping":
+            sock.write(b"pong\n")
+            sock.waitForBytesWritten(200)
         sock.disconnectFromServer()
-        sock.deleteLater()
 
     def send_command(self, command: str) -> bool:
         if command not in _IPC_COMMANDS:

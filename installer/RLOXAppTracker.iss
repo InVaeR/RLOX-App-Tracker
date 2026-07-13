@@ -77,40 +77,58 @@ Type: dirifempty; Name: "{app}"
 
 [Code]
 var
-  DataPage: TInputOptionWizardPage;
   DataPath: string;
   ProductDataRoot: string;
   InstallStatePath: string;
   OldDataFound: Boolean;
   IsUpdate: Boolean;
-  PrevVersion: string;
+  ExistingCurrentVersion: string;
+  ExistingPreviousVersion: string;
 
-function ExtractVersionFromJson(const FilePath: string): string;
+function LoadTextFile(const FilePath: string): string;
 var
   Lines: TArrayOfString;
-  Content: string;
   i: Integer;
+begin
+  Result := '';
+  if not FileExists(FilePath) then Exit;
+  if not LoadStringsFromFile(FilePath, Lines) then Exit;
+  for i := 0 to GetArrayLength(Lines) - 1 do
+  begin
+    if i > 0 then Result := Result + #13#10;
+    Result := Result + Lines[i];
+  end;
+end;
+
+function ExtractJsonString(const FilePath: string; const Key: string): string;
+var
+  Content: string;
+  Tail: string;
+  KeyPos: Integer;
+  ColonPos: Integer;
   QuotePos: Integer;
   EndQuotePos: Integer;
 begin
   Result := '';
-  if not FileExists(FilePath) then Exit;
-  Content := '';
-  if LoadStringsFromFile(FilePath, Lines) then
-  begin
-    for i := 0 to GetArrayLength(Lines) - 1 do
-    begin
-      if i > 0 then Content := Content + #13#10;
-      Content := Content + Lines[i];
-    end;
-  end;
-  QuotePos := Pos('"currentVersion"', Content);
+  Content := LoadTextFile(FilePath);
+  if Content = '' then Exit;
+
+  KeyPos := Pos('"' + Key + '"', Content);
+  if KeyPos = 0 then Exit;
+
+  Tail := Copy(Content, KeyPos + Length(Key) + 2, Length(Content));
+  ColonPos := Pos(':', Tail);
+  if ColonPos = 0 then Exit;
+
+  Tail := Copy(Tail, ColonPos + 1, Length(Tail));
+  QuotePos := Pos('"', Tail);
   if QuotePos = 0 then Exit;
-  QuotePos := Pos('"', Copy(Content, QuotePos + 16, 50));
-  if QuotePos = 0 then Exit;
-  EndQuotePos := Pos('"', Copy(Content, QuotePos + 1, 30));
+
+  Tail := Copy(Tail, QuotePos + 1, Length(Tail));
+  EndQuotePos := Pos('"', Tail);
   if EndQuotePos = 0 then Exit;
-  Result := Copy(Content, QuotePos + 1, EndQuotePos - 1);
+
+  Result := Copy(Tail, 1, EndQuotePos - 1);
 end;
 
 function GetChannelFromVersion(const Version: string): string;
@@ -129,6 +147,14 @@ begin
   StringChange(Result, '\', '\\');
 end;
 
+function JsonNullableString(const S: string): string;
+begin
+  if S = '' then
+    Result := 'null'
+  else
+    Result := '"' + S + '"';
+end;
+
 function InitializeSetup: Boolean;
 begin
   Result := True;
@@ -136,33 +162,74 @@ begin
   ProductDataRoot := ExpandConstant('{localappdata}') + '\RLOX App Tracker';
   InstallStatePath := ExpandConstant('{localappdata}\Programs\RLOX App Tracker\state\install.json');
   OldDataFound := DirExists(DataPath);
-  IsUpdate := CmdLineParamExists('/UPDATE');
+  IsUpdate := CompareText(ExpandConstant('{param:UPDATE|0}'), '1') = 0;
 
-  if IsUpdate then
-    PrevVersion := ExtractVersionFromJson(InstallStatePath);
+  ExistingCurrentVersion := '';
+  ExistingPreviousVersion := '';
+
+  if FileExists(InstallStatePath) then
+  begin
+    ExistingCurrentVersion := ExtractJsonString(InstallStatePath, 'currentVersion');
+    ExistingPreviousVersion := ExtractJsonString(InstallStatePath, 'previousVersion');
+  end;
 end;
 
 procedure WriteInstallJson;
 var
   Json: string;
   StateDir: string;
+  StatePath: string;
+  TempPath: string;
   EscapedExe: string;
+  CurrentVersionJson: string;
+  PreviousVersionJson: string;
+  PendingVersionJson: string;
 begin
   StateDir := ExpandConstant('{localappdata}\Programs\RLOX App Tracker\state');
   ForceDirectories(StateDir);
+  StatePath := StateDir + '\install.json';
+  TempPath := StatePath + '.tmp';
   EscapedExe := EscapeBackslash('versions\{#AppVersion}\{#MyAppExeName}');
+
+  if IsUpdate and (ExistingCurrentVersion <> '') then
+  begin
+    CurrentVersionJson := JsonNullableString(ExistingCurrentVersion);
+    PreviousVersionJson := JsonNullableString(ExistingPreviousVersion);
+    PendingVersionJson := JsonNullableString('{#AppVersion}');
+  end
+  else
+  begin
+    CurrentVersionJson := JsonNullableString('{#AppVersion}');
+    PreviousVersionJson := 'null';
+    PendingVersionJson := 'null';
+  end;
 
   Json := '{' + #13#10 +
           '  "schemaVersion": 1,' + #13#10 +
-          '  "currentVersion": "{#AppVersion}",' + #13#10 +
-          '  "previousVersion": "' + PrevVersion + '",' + #13#10 +
-          '  "pendingVersion": "",' + #13#10 +
+          '  "currentVersion": ' + CurrentVersionJson + ',' + #13#10 +
+          '  "previousVersion": ' + PreviousVersionJson + ',' + #13#10 +
+          '  "pendingVersion": ' + PendingVersionJson + ',' + #13#10 +
+          '  "launchAttemptedAt": null,' + #13#10 +
+          '  "startupConfirmed": false,' + #13#10 +
           '  "channel": "' + GetChannelFromVersion('{#AppVersion}') + '",' + #13#10 +
-          '  "installedAt": "' + GetDateTimeString('yyyy-mm-dd", "hh:nn:ss', '-', ':') + '",' + #13#10 +
+          '  "installedAt": "' + GetDateTimeString('yyyy-mm-dd"T"hh:nn:ss', '-', ':') + '",' + #13#10 +
           '  "appExecutable": "' + EscapedExe + '"' + #13#10 +
           '}';
 
-  SaveStringToFile(StateDir + '\install.json', Json, False);
+  if FileExists(TempPath) then DeleteFile(TempPath);
+  if not SaveStringToFile(TempPath, Json, False) then
+    RaiseException('Не удалось записать временный install.json');
+
+  if FileExists(StatePath) then
+  begin
+    if not FileCopy(StatePath, StatePath + '.bak', False) then
+      Log('Не удалось создать install.json.bak');
+    if not DeleteFile(StatePath) then
+      RaiseException('Не удалось заменить install.json');
+  end;
+
+  if not RenameFile(TempPath, StatePath) then
+    RaiseException('Не удалось активировать новый install.json');
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);

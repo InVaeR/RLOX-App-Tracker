@@ -53,8 +53,8 @@ internal static class AppLauncher
         // Find highest version directory
         var latest = dirs
             .Select(Path.GetFileName)
-            .Where(v => !string.IsNullOrEmpty(v) && System.Version.TryParse(v, out _))
-            .OrderByDescending(v => System.Version.Parse(v!))
+            .Where(v => !string.IsNullOrEmpty(v) && SemVersion.TryParse(v, out _))
+            .OrderByDescending(v => SemVersion.Parse(v!))
             .FirstOrDefault();
 
         return latest;

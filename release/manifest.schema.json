@@ -1,25 +1,70 @@
 {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "RLOX App Tracker Update Manifest",
-    "type": "object",
-    "required": ["schemaVersion", "product", "version", "installer"],
-    "properties": {
-        "schemaVersion": { "type": "integer", "minimum": 1 },
-        "product": { "type": "string", "pattern": "^rlox-app-tracker$" },
-        "channel": { "type": "string", "enum": ["stable", "beta", "dev"] },
-        "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(-\\w+(\\.\\d+)?)?$" },
-        "minimumLauncherVersion": { "type": "string" },
-        "publishedAt": { "type": "string", "format": "date-time" },
-        "mandatory": { "type": "boolean" },
-        "installer": {
-            "type": "object",
-            "required": ["url", "sha256", "size"],
-            "properties": {
-                "url": { "type": "string", "format": "uri" },
-                "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-                "size": { "type": "integer", "minimum": 1 }
-            }
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RLOX App Tracker Update Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "product",
+    "channel",
+    "version",
+    "minimumLauncherVersion",
+    "publishedAt",
+    "mandatory",
+    "installer",
+    "releaseNotesUrl"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "product": {
+      "const": "rlox-app-tracker"
+    },
+    "channel": {
+      "type": "string",
+      "enum": ["stable", "beta", "dev"]
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "minimumLauncherVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "publishedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "mandatory": {
+      "type": "boolean"
+    },
+    "installer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "sha256", "size"],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
         },
-        "releaseNotesUrl": { "type": "string", "format": "uri" }
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500000000
+        }
+      }
+    },
+    "releaseNotesUrl": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
     }
+  }
 }

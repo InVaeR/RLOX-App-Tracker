@@ -17,7 +17,7 @@ internal static class UpdateInstaller
             var psi = new ProcessStartInfo
             {
                 FileName = setupPath,
-                Arguments = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /UPDATE",
+                Arguments = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /UPDATE=1",
                 UseShellExecute = false,
             };
 

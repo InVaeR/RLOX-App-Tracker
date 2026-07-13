@@ -2,135 +2,227 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
 
 jobs:
   release:
     runs-on: windows-latest
-    permissions:
-      contents: write
+
+    defaults:
+      run:
+        shell: pwsh
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
-      - name: Get version from tag
-        id: version
-        run: |
-          $tag = "${{ github.ref_name }}"
-          $ver = $tag -replace "^v", ""
-          echo "version=$ver" >> $env:GITHUB_OUTPUT
-          # Numeric version for Windows file version (major.minor.patch.build)
-          $parts = $ver -split '-'
-          $base = $parts[0]
-          if ($parts.Length -gt 1 -and $parts[1] -match 'alpha\.(\d+)') {
-            $numVer = "$base.$($matches[1])"
-          } elseif ($parts.Length -gt 1 -and $parts[1] -match 'beta\.(\d+)') {
-            $numVer = "$base.$($matches[1])"
-          } else {
-            $numVer = "$base.0"
-          }
-          echo "version_numeric=$numVer" >> $env:GITHUB_OUTPUT
-
-      - name: Check tag matches version.py
-        run: |
-          $ver = (python -c "exec(open('app/src/rlox_app_tracker/version.py').read()); print(__version_base__)")
-          if ("v$ver" -ne "${{ github.ref_name }}") {
-            Write-Error "Tag mismatch: release tag ${{ github.ref_name }} != version.py v$ver"
-            exit 1
-          }
-
-      - name: Determine prerelease status
-        id: channel
-        run: |
-          $tag = "${{ github.ref_name }}"
-          if ($tag -match '-alpha') {
-            echo "prerelease=true" >> $env:GITHUB_OUTPUT
-          } elseif ($tag -match '-beta') {
-            echo "prerelease=true" >> $env:GITHUB_OUTPUT
-          } elseif ($tag -match '-rc') {
-            echo "prerelease=true" >> $env:GITHUB_OUTPUT
-          } else {
-            echo "prerelease=false" >> $env:GITHUB_OUTPUT
-          }
-
-      - name: Install Inno Setup
-        run: choco install innosetup --no-progress -y
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r app/requirements-dev.txt
-
-      - name: Ruff checks
-        run: |
-          ruff check app/src/ app/tests/
-          ruff format --check app/src/ app/tests/
-
-      - name: Run Python tests
-        run: python -m pytest app/tests/ -v
-
-      - name: Build app
-        run: |
-          pyinstaller app/RLOXAppTracker.spec --noconfirm
-
-      - name: Smoke test
-        run: |
-          if (-not (Test-Path "dist/RLOXAppTracker/RLOXAppTracker.exe")) {
-            Write-Error "EXE not found"
-            exit 1
-          }
+          cache: "pip"
+          cache-dependency-path: app/requirements-dev.txt
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
 
-      - name: Run launcher tests
-        run: dotnet test launcher/tests/RLOXLauncher.Tests.csproj --verbosity normal
+      - name: Read and validate release version
+        id: version
+        run: |
+          $tag = "${{ github.ref_name }}"
 
-      - name: Build launcher
+          if ($tag -notmatch '^v(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$') {
+            throw "Invalid release tag: $tag"
+          }
+
+          $version = $tag.Substring(1)
+          $major = [int]$matches[1]
+          $minor = [int]$matches[2]
+          $patch = [int]$matches[3]
+          $pre = $matches[4]
+
+          $build = 0
+          $channel = "stable"
+          $prerelease = "false"
+
+          if ($pre) {
+            $prerelease = "true"
+
+            if ($pre -match '^alpha(?:\.(\d+))?$') {
+              $channel = "dev"
+              if ($matches[1]) { $build = [int]$matches[1] }
+            }
+            elseif ($pre -match '^(?:beta|rc)(?:\.(\d+))?$') {
+              $channel = "beta"
+              if ($matches[1]) { $build = [int]$matches[1] }
+            }
+            else {
+              $channel = "dev"
+            }
+          }
+
+          $numericVersion = "$major.$minor.$patch.$build"
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "version_numeric=$numericVersion" >> $env:GITHUB_OUTPUT
+          "channel=$channel" >> $env:GITHUB_OUTPUT
+          "prerelease=$prerelease" >> $env:GITHUB_OUTPUT
+
+          Write-Host "Version: $version"
+          Write-Host "Numeric version: $numericVersion"
+          Write-Host "Channel: $channel"
+          Write-Host "Prerelease: $prerelease"
+
+      - name: Check tag against Python version
+        run: |
+          $projectVersion = python -c "exec(open('app/src/rlox_app_tracker/version.py', encoding='utf-8').read()); print(__version_base__)"
+
+          if ($projectVersion -ne "${{ steps.version.outputs.version }}") {
+            throw "Tag version '${{ steps.version.outputs.version }}' does not match version.py '$projectVersion'"
+          }
+
+      - name: Install Inno Setup
+        run: |
+          choco install innosetup --no-progress -y
+
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            throw "ISCC.exe was not found after installation"
+          }
+
+          & $iscc /?
+          if ($LASTEXITCODE -ne 0) {
+            throw "ISCC validation failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r app/requirements-dev.txt
+
+      - name: Ruff
+        run: |
+          ruff check app/src app/tests
+          ruff format --check app/src app/tests
+
+      - name: Python tests
+        run: python -m pytest app/tests -v
+
+      - name: Launcher tests
+        run: |
+          dotnet test launcher/tests/RLOXLauncher.Tests.csproj `
+            --configuration Release `
+            --verbosity normal
+
+      - name: Build Python application
+        run: |
+          pyinstaller app/RLOXAppTracker.spec `
+            --clean `
+            --noconfirm
+
+          $appExe = "dist/RLOXAppTracker/RLOXAppTracker.exe"
+          if (-not (Test-Path $appExe)) {
+            throw "Application EXE not found: $appExe"
+          }
+
+          $assets = "dist/RLOXAppTracker/assets"
+          if (-not (Test-Path $assets)) {
+            throw "Application assets not found: $assets"
+          }
+
+      - name: Publish launcher
         run: |
           dotnet publish launcher/src/RLOXLauncher/RLOXLauncher.csproj `
             --configuration Release `
             --runtime win-x64 `
+            --self-contained true `
             --output dist/launcher `
             -p:PublishSingleFile=true `
             -p:IncludeNativeLibrariesForSelfExtract=true
 
+          $launcher = "dist/launcher/RLOXLauncher.exe"
+          if (-not (Test-Path $launcher)) {
+            throw "Launcher EXE not found: $launcher"
+          }
+
       - name: Build installer
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) {
-            Write-Error "Inno Setup 6 not found — installer build required for release"
-            exit 1
+
+          & $iscc `
+            "/DAppVersion=${{ steps.version.outputs.version }}" `
+            "/DAppVersionNumeric=${{ steps.version.outputs.version_numeric }}" `
+            "installer/RLOXAppTracker.iss"
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup failed with exit code $LASTEXITCODE"
           }
-          & $iscc "/DAppVersion=${{ steps.version.outputs.version }}" "/DAppVersionNumeric=${{ steps.version.outputs.version_numeric }}" installer/RLOXAppTracker.iss
+
+          $expectedSetup = "dist/RLOX-App-Tracker-Setup-${{ steps.version.outputs.version }}-x64.exe"
+
+          if (-not (Test-Path $expectedSetup)) {
+            throw "Installer not found: $expectedSetup"
+          }
+
+          "setup_path=$expectedSetup" >> $env:GITHUB_ENV
 
       - name: Generate SHA-256
         run: |
-          $setup = Get-ChildItem -Path dist -Filter "RLOX-App-Tracker-Setup-*.exe" | Select-Object -First 1
-          if ($setup) {
-            $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLower()
-            $hash | Out-File -FilePath "dist/SHA256SUMS.txt" -Encoding utf8
-            Write-Host "SHA256: $hash"
-          }
+          $setup = Get-Item $env:setup_path
+          $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
 
-      - name: Generate manifest
+          "$hash *$($setup.Name)" |
+            Set-Content "dist/SHA256SUMS.txt" -Encoding ascii
+
+          Write-Host "SHA-256: $hash"
+
+      - name: Generate update manifest
         run: |
-          $setup = Get-ChildItem -Path dist -Filter "RLOX-App-Tracker-Setup-*.exe" | Select-Object -First 1
-          if ($setup) {
-            python build/generate_manifest.py $setup.FullName "${{ steps.version.outputs.version }}"
+          python build/generate_manifest.py `
+            --setup "$env:setup_path" `
+            --version "${{ steps.version.outputs.version }}" `
+            --channel "${{ steps.version.outputs.channel }}" `
+            --repository "${{ github.repository }}" `
+            --output "release/${{ steps.version.outputs.channel }}.json"
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Manifest generation failed"
           }
 
-      - name: Create Release
+          if (-not (Test-Path "release/${{ steps.version.outputs.channel }}.json")) {
+            throw "release/${{ steps.version.outputs.channel }}.json was not generated"
+          }
+
+          # Also copy to latest.json for backward compatibility
+          Copy-Item "release/${{ steps.version.outputs.channel }}.json" "release/latest.json"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rlox-app-tracker-${{ steps.version.outputs.version }}
+          if-no-files-found: error
+          path: |
+            dist/RLOX-App-Tracker-Setup-${{ steps.version.outputs.version }}-x64.exe
+            dist/SHA256SUMS.txt
+            release/latest.json
+            release/${{ steps.version.outputs.channel }}.json
+
+      - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
           name: "v${{ steps.version.outputs.version }}"
           draft: false
-          prerelease: ${{ steps.channel.outputs.prerelease }}
+          prerelease: ${{ steps.version.outputs.prerelease }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
-            dist/RLOX-App-Tracker-Setup-*.exe
+            dist/RLOX-App-Tracker-Setup-${{ steps.version.outputs.version }}-x64.exe
             dist/SHA256SUMS.txt
             release/latest.json
+            release/${{ steps.version.outputs.channel }}.json

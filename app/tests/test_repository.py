@@ -11,7 +11,11 @@ from rlox_app_tracker.services.watchlist import WatchListManager
 
 @pytest.fixture
 def db(tmp_path: Path):
-    return Database(tmp_path / "test.db")
+    database = Database(tmp_path / "test.db")
+    try:
+        yield database
+    finally:
+        database.close()
 
 
 @pytest.fixture

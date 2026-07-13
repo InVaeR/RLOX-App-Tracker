@@ -245,7 +245,7 @@ class DashboardView(QWidget):
         if not self._stats:
             return
         period = self.period_combo.currentText().replace(" ", "_").lower()
-        path, _ = QFileDialog.getSaveFileName(self, "Экспорт статистики", f"rusloxpy_{period}.csv", "CSV (*.csv)")
+        path, _ = QFileDialog.getSaveFileName(self, "Экспорт статистики", f"rlox_app_tracker_{period}.csv", "CSV (*.csv)")
         if not path:
             return
         try:
