@@ -9,7 +9,7 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        ('assets', 'assets'),
+        ('../assets', 'assets'),
     ],
     hiddenimports=[
         'win32gui',
@@ -52,7 +52,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='assets/app.ico',
+    icon='../assets/app.ico',
 )
 
 coll = COLLECT(
