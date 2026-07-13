@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 from services.config_manager import ConfigManager
 from services.autostart import enable_autostart, disable_autostart, is_autostart_enabled
 from services.update_worker import check_for_update_async
+from services.updater import UpdateStatus
 from data.repository import Repository
 from version import __version__
 from config import DEFAULT_IDLE_THRESHOLD, DEFAULT_POLL_INTERVAL, DEFAULT_SAVE_TITLES, DEFAULT_MINIMIZE_TO_TRAY
@@ -115,10 +116,11 @@ class SettingsView(QWidget):
         self._btn_update.setText("Проверка…")
         self._upd_sig = check_for_update_async(self._on_update_result)
 
-    def _on_update_result(self, info):
+    def _on_update_result(self, result):
         self._btn_update.setEnabled(True)
         self._btn_update.setText("Проверить обновления")
-        if info:
+        if result.status == UpdateStatus.UPDATE_AVAILABLE:
+            info = result.info
             msg = f"Доступна версия {info.version}."
             if info.notes:
                 msg += f"\n\n{info.notes[:500]}"
@@ -127,24 +129,33 @@ class SettingsView(QWidget):
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             if r == QMessageBox.StandardButton.Yes:
                 webbrowser.open(info.url)
-        else:
+        elif result.status == UpdateStatus.UP_TO_DATE:
             QMessageBox.information(self, "Обновление",
-                                   "У вас последняя версия.")
+                                   "У вас установлена последняя версия.")
+        elif result.status == UpdateStatus.ERROR:
+            QMessageBox.warning(self, "Обновление",
+                               f"Не удалось проверить обновления.\n\n{result.error or 'Неизвестная ошибка'}")
 
     def _group(self, title):
         box = QGroupBox(title)
         return box
 
     def _save(self):
-        self.config.set("idle_threshold", self.idle_spin.value() * 60)
-        self.config.set("poll_interval", self.poll_spin.value())
-        self.config.set("save_window_titles", self.titles_check.isChecked())
-        self.config.set("minimize_to_tray", self.minimize_check.isChecked())
-        self.config.set("check_updates_on_start", self.updates_check.isChecked())
-        if self.autostart_check.isChecked():
-            enable_autostart()
-        else:
-            disable_autostart()
+        self.config.update({
+            "idle_threshold": self.idle_spin.value() * 60,
+            "poll_interval": self.poll_spin.value(),
+            "save_window_titles": self.titles_check.isChecked(),
+            "minimize_to_tray": self.minimize_check.isChecked(),
+            "check_updates_on_start": self.updates_check.isChecked(),
+        })
+        try:
+            if self.autostart_check.isChecked():
+                enable_autostart()
+            else:
+                disable_autostart()
+        except OSError as e:
+            QMessageBox.warning(self, "Автозапуск",
+                               f"Не удалось изменить автозапуск:\n{e}")
         if self._on_settings_changed:
             self._on_settings_changed()
         self._btn_save.setText("✓ Сохранено")

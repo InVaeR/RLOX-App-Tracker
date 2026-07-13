@@ -1,33 +1,90 @@
-name: Build & Release
+name: Release
 
 on:
   push:
-    tags: ['v*']
-
-permissions:
-  contents: write
+    tags: ["v*"]
 
 jobs:
-  build:
+  release:
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
-      - name: Install deps
-        run: pip install -r requirements-dev.txt
-
-      - name: Build
+      - name: Get version from tag
+        id: version
         run: |
-          python gen_icon.py
-          python gen_version.py
-          pyinstaller build.spec --clean --noconfirm
+          $tag = "${{ github.ref_name }}"
+          $ver = $tag -replace "^v", ""
+          echo "version=$ver" >> $env:GITHUB_OUTPUT
 
-      - name: Release
+      - name: Check tag matches version.py
+        run: |
+          $ver = (python -c "exec(open('app/src/rlox_app_tracker/version.py').read()); print(__version_base__)")
+          if ("v$ver" -ne "${{ github.ref_name }}") {
+            Write-Error "Tag mismatch: release tag ${{ github.ref_name }} != version.py v$ver"
+            exit 1
+          }
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r app/requirements-dev.txt
+
+      - name: Run tests
+        run: python -m pytest app/tests/ -v
+
+      - name: Build app
+        run: |
+          pyinstaller app/RLOXAppTracker.spec --noconfirm
+
+      - name: Smoke test
+        run: |
+          if (-not (Test-Path "dist/app/versions/${{ steps.version.outputs.version }}/RLOXAppTracker.exe")) {
+            Write-Error "EXE not found"
+            exit 1
+          }
+
+      - name: Build launcher
+        run: |
+          pyinstaller --noconfirm --onedir --name RLOXLauncher --distpath dist/launcher --workpath build/pyinstaller_launcher --windowed launcher/src/launcher.py
+
+      - name: Build installer
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (Test-Path $iscc) {
+            & $iscc "/DAppVersion=${{ steps.version.outputs.version }}" installer/RLOXAppTracker.iss
+          } else {
+            Write-Warning "Inno Setup not found, skipping installer build"
+          }
+
+      - name: Generate SHA-256
+        run: |
+          $setup = Get-ChildItem -Path dist -Filter "RLOX-App-Tracker-Setup-*.exe" | Select-Object -First 1
+          if ($setup) {
+            $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLower()
+            $hash | Out-File -FilePath "dist/SHA256SUMS.txt" -Encoding utf8
+            Write-Host "SHA256: $hash"
+          }
+
+      - name: Generate manifest
+        run: |
+          $setup = Get-ChildItem -Path dist -Filter "RLOX-App-Tracker-Setup-*.exe" | Select-Object -First 1
+          if ($setup) {
+            python build/generate_manifest.py $setup.FullName "${{ steps.version.outputs.version }}"
+          }
+
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/RusLOXPy.exe
-          generate_release_notes: true
+          name: "v${{ steps.version.outputs.version }}"
+          draft: false
+          prerelease: false
+          files: |
+            dist/RLOX-App-Tracker-Setup-*.exe
+            dist/SHA256SUMS.txt
+            release/latest.json

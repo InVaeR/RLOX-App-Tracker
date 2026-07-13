@@ -37,16 +37,23 @@ class ConfigManager:
             self._data = {}
 
     def _save(self):
-        self._path.write_text(
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        temp_path = self._path.with_suffix(".tmp")
+        temp_path.write_text(
             json.dumps(self._data, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
+        temp_path.replace(self._path)
 
     def get(self, key: str, default: Any = None) -> Any:
         return self._data.get(key, default)
 
     def set(self, key: str, value: Any):
         self._data[key] = value
+        self._save()
+
+    def update(self, mapping: dict[str, object]):
+        self._data.update(mapping)
         self._save()
 
     def get_int(self, key: str, default: int = 0) -> int:

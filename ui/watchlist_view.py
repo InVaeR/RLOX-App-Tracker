@@ -20,6 +20,12 @@ from ui.theme import PALETTE as C
 from utils.format import fmt_duration
 
 
+class NumericTableItem(QTableWidgetItem):
+    def __lt__(self, other):
+        return (self.data(Qt.ItemDataRole.UserRole) or 0) < \
+               (other.data(Qt.ItemDataRole.UserRole) or 0)
+
+
 class AddAppDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -205,7 +211,7 @@ class WatchListView(QWidget):
                 self.table.setItem(i, col, item)
 
             sec = today_map.get(app.process_name, 0)
-            time_item = QTableWidgetItem(fmt_duration(sec, short=True))
+            time_item = NumericTableItem(fmt_duration(sec, short=True))
             time_item.setData(Qt.ItemDataRole.UserRole, sec)
             time_item.setFlags(
                 time_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
@@ -275,6 +281,8 @@ class WatchListView(QWidget):
         )
         if ok and new.strip() and self._repo:
             self._repo.update_display_name(app_id, new.strip())
+            if self._on_changed:
+                self._on_changed()
             self.refresh()
 
     def _context_menu(self, pos):

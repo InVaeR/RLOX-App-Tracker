@@ -20,6 +20,7 @@ from services.config_manager import ConfigManager
 from services.reporter import Reporter
 from services.watchlist import WatchListManager
 from services.update_worker import check_for_update_async
+from services.updater import UpdateStatus
 from utils.format import fmt_duration
 from config import ICON_PATH, APP_VERSION
 
@@ -74,13 +75,19 @@ class MainWindow(QMainWindow):
         sb.setSpacing(S.xs)
 
         logo_pix = asset_pixmap("real-time.png", 24)
-        logo = QLabel()
+        logo_row = QWidget()
+        logo_row_layout = QHBoxLayout(logo_row)
+        logo_row_layout.setContentsMargins(14, 8, 14, 20)
+        logo_icon = QLabel()
         if not logo_pix.isNull():
-            logo.setPixmap(logo_pix)
-        logo.setText("  RusLOXPy")
-        logo.setStyleSheet(
-            "font-size:18px; font-weight:700; padding:8px 14px 20px 14px;")
-        sb.addWidget(logo)
+            logo_icon.setPixmap(logo_pix)
+        logo_text = QLabel("RusLOXPy")
+        logo_text.setStyleSheet(
+            "font-size:18px; font-weight:700;")
+        logo_row_layout.addWidget(logo_icon)
+        logo_row_layout.addWidget(logo_text)
+        logo_row_layout.addStretch()
+        sb.addWidget(logo_row)
 
         self.nav_group = QButtonGroup(self)
         self.btn_dash = NavButton("Дашборд", "stats.png")
@@ -146,19 +153,58 @@ class MainWindow(QMainWindow):
     def _check_update_startup(self):
         self._upd_sig = check_for_update_async(self._show_update_dialog)
 
-    def _show_update_dialog(self, info):
+    def _show_update_dialog(self, result):
         from PySide6.QtWidgets import QMessageBox
         import webbrowser
-        if not info:
+        if result.status == UpdateStatus.ERROR:
             return
-        msg = f"Доступна версия {info.version} (текущая: {APP_VERSION})."
-        if info.notes:
-            msg += f"\n\n{info.notes[:500]}"
-        r = QMessageBox.information(
-            self, "Обновление", msg,
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        if r == QMessageBox.StandardButton.Yes:
-            webbrowser.open(info.url)
+        if result.status == UpdateStatus.UP_TO_DATE:
+            return
+        if result.status == UpdateStatus.UPDATE_AVAILABLE:
+            info = result.info
+            msg = f"Доступна версия {info.version} (текущая: {APP_VERSION})."
+            if info.notes:
+                msg += f"\n\n{info.notes[:500]}"
+            self.showNormal()
+            self.activateWindow()
+            self.raise_()
+            r = QMessageBox.information(
+                self, "Обновление", msg,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if r == QMessageBox.StandardButton.Yes:
+                webbrowser.open(info.url)
+
+    def _manual_check_update(self):
+        from PySide6.QtWidgets import QMessageBox
+        import webbrowser
+        self._upd_sig = check_for_update_async(self._show_manual_update_result)
+        QMessageBox.information(self, "Проверка обновлений",
+                                "Проверка обновлений выполняется...")
+
+    def _show_manual_update_result(self, result):
+        from PySide6.QtWidgets import QMessageBox
+        import webbrowser
+        if result.status == UpdateStatus.UPDATE_AVAILABLE:
+            info = result.info
+            msg = f"Доступна версия {info.version} (текущая: {APP_VERSION})."
+            if info.notes:
+                msg += f"\n\n{info.notes[:500]}"
+            self.showNormal()
+            self.activateWindow()
+            self.raise_()
+            r = QMessageBox.information(
+                self, "Обновление", msg,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if r == QMessageBox.StandardButton.Yes:
+                webbrowser.open(info.url)
+        elif result.status == UpdateStatus.UP_TO_DATE:
+            QMessageBox.information(
+                self, "Проверка обновлений",
+                "У вас установлена последняя версия.")
+        elif result.status == UpdateStatus.ERROR:
+            QMessageBox.warning(
+                self, "Проверка обновлений",
+                f"Не удалось проверить обновления.\n\n{result.error or 'Неизвестная ошибка'}")
 
     def _nav_to(self, idx: int):
         self.nav_group.button(idx).setChecked(True)
@@ -275,8 +321,6 @@ class MainWindow(QMainWindow):
             return
         self._closing = True
         self.tracker.stop()
-        if getattr(self, "db", None):
-            self.db.close()
         self.tray_icon.hide()
         QApplication.quit()
 

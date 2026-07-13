@@ -10,20 +10,19 @@ class Repository:
         self.db = db
 
     def add_watched_app(self, app: WatchedApp) -> int:
-        existing = self.db.execute(
-            "SELECT id FROM watched_apps WHERE process_name = ?", (app.process_name,)
-        ).fetchone()
-        if existing:
-            return -1
         cur = self.db.execute(
-            "INSERT INTO watched_apps (process_name, display_name, exe_path) VALUES (?, ?, ?)",
+            "INSERT OR IGNORE INTO watched_apps (process_name, display_name, exe_path) VALUES (?, ?, ?)",
             (app.process_name, app.display_name, app.exe_path),
         )
         self.db.commit()
+        if cur.rowcount == 0:
+            row = self.db.execute(
+                "SELECT id FROM watched_apps WHERE process_name = ?", (app.process_name,)
+            ).fetchone()
+            return row["id"] if row else 0
         return cur.lastrowid or 0
 
     def remove_watched_app(self, app_id: int):
-        self.db.execute("DELETE FROM sessions WHERE app_id = ?", (app_id,))
         self.db.execute("DELETE FROM watched_apps WHERE id = ?", (app_id,))
         self.db.commit()
 
@@ -53,27 +52,28 @@ class Repository:
 
     def update_session(self, session: Session):
         self.db.execute(
-            "UPDATE sessions SET end_time = ?, duration_sec = ?, active_sec = ?, background_sec = ?, window_title = COALESCE(?, window_title) WHERE id = ?",
-            (session.end_time, session.duration_sec, session.active_sec, session.background_sec, session.window_title, session.id),
+            "UPDATE sessions SET end_time = ?, duration_sec = ?, active_sec = ?, background_sec = ?, window_title = COALESCE(?, window_title), last_seen_at = ? WHERE id = ?",
+            (session.end_time, session.duration_sec, session.active_sec, session.background_sec, session.window_title, session.end_time, session.id),
         )
         self.db.commit()
 
     def flush_session(self, session_id: int, duration_sec: int, active_sec: int, background_sec: int, title: str = None):
+        now = datetime.now()
         if title:
             self.db.execute(
-                "UPDATE sessions SET duration_sec = ?, active_sec = ?, background_sec = ?, window_title = ? WHERE id = ?",
-                (duration_sec, active_sec, background_sec, title, session_id),
+                "UPDATE sessions SET duration_sec = ?, active_sec = ?, background_sec = ?, window_title = ?, last_seen_at = ? WHERE id = ?",
+                (duration_sec, active_sec, background_sec, title, now, session_id),
             )
         else:
             self.db.execute(
-                "UPDATE sessions SET duration_sec = ?, active_sec = ?, background_sec = ? WHERE id = ?",
-                (duration_sec, active_sec, background_sec, session_id),
+                "UPDATE sessions SET duration_sec = ?, active_sec = ?, background_sec = ?, last_seen_at = ? WHERE id = ?",
+                (duration_sec, active_sec, background_sec, now, session_id),
             )
         self.db.commit()
 
     def close_all_active_sessions(self):
         self.db.execute(
-            "UPDATE sessions SET end_time = ?, duration_sec = COALESCE(active_sec,0) + COALESCE(background_sec,0) WHERE end_time IS NULL",
+            "UPDATE sessions SET end_time = COALESCE(last_seen_at, ?), duration_sec = COALESCE(active_sec,0) + COALESCE(background_sec,0) WHERE end_time IS NULL",
             (datetime.now(),),
         )
         self.db.commit()

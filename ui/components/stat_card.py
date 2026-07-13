@@ -28,3 +28,6 @@ class StatCard(QFrame):
     def set_value(self, value: str, sub: str = ""):
         self._value.setText(value)
         self._sub.setText(sub)
+
+    def set_title(self, title: str):
+        self._title.setText(title)

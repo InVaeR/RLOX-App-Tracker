@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional, Dict, List
 from dataclasses import dataclass
+import time
 
 from PySide6.QtCore import QObject, QTimer, Signal
 
@@ -59,10 +60,11 @@ class TrackerService(QObject):
         self._poll_interval = DEFAULT_POLL_INTERVAL
         self._idle_threshold = DEFAULT_IDLE_THRESHOLD
         self._save_titles = True
-        self._last_tick_time: Optional[datetime] = None
+        self._last_tick_monotonic: Optional[float] = None
         self._tick_count = 0
         self._watched_cache: List[WatchedApp] = []
         self._cache_dirty = True
+        self._last_known_date: Optional[str] = None
         self._load_settings()
 
     def _load_settings(self):
@@ -75,7 +77,8 @@ class TrackerService(QObject):
         self._sessions.clear()
         self._running = True
         self._paused = False
-        self._last_tick_time = datetime.now()
+        self._last_tick_monotonic = time.monotonic()
+        self._last_known_date = datetime.now().date().isoformat()
         self._timer.start(int(self._poll_interval * 1000))
 
     def stop(self):
@@ -84,13 +87,30 @@ class TrackerService(QObject):
         self._timer.stop()
 
     def pause(self):
+        if self._paused:
+            return
         self._paused = True
         self._close_all_sessions()
+        self._last_tick_monotonic = None
+        self._emit_paused_info()
         self.tracking_paused.emit()
 
     def resume(self):
+        if not self._paused:
+            return
         self._paused = False
+        self._last_tick_monotonic = time.monotonic()
         self.tracking_resumed.emit()
+
+    def _emit_paused_info(self):
+        self.active_app_info.emit({
+            "paused": True,
+            "running_apps": [],
+            "background_apps": [],
+            "focused": None,
+            "focused_display": "",
+            "focused_sec": 0,
+        })
 
     @property
     def is_paused(self) -> bool:
@@ -114,21 +134,22 @@ class TrackerService(QObject):
             self._cache_dirty = False
         return self._watched_cache
 
-    def _compute_delta(self, now: datetime) -> tuple:
+    def _compute_delta(self) -> tuple:
         slept = False
         delta = self._poll_interval
-        if self._last_tick_time is not None:
-            elapsed = (now - self._last_tick_time).total_seconds()
+        now_mono = time.monotonic()
+        if self._last_tick_monotonic is not None:
+            elapsed = now_mono - self._last_tick_monotonic
             max_gap = max(self._poll_interval * 3, 10)
             slept = elapsed > max_gap
             if slept:
                 delta = 0
             else:
                 delta = min(elapsed, self._poll_interval * 2)
-        self._last_tick_time = now
+        self._last_tick_monotonic = now_mono
         return delta, slept
 
-    def _collect_context(self, now: datetime, delta: int, slept: bool) -> _TickContext:
+    def _collect_context(self, now: datetime, delta: float, slept: bool) -> _TickContext:
         idle_now = get_idle_seconds()
         window = get_active_window_process()
         focused_name = window["name"] if window else None
@@ -220,6 +241,12 @@ class TrackerService(QObject):
             "focused_sec": ctx.focused_sec,
         })
 
+    def _check_day_boundary(self, now: datetime):
+        today = now.date().isoformat()
+        if self._last_known_date is not None and self._last_known_date != today:
+            self._close_all_sessions()
+        self._last_known_date = today
+
     def _tick(self):
         if self._paused:
             return
@@ -227,7 +254,9 @@ class TrackerService(QObject):
         self._tick_count += 1
         now = datetime.now()
 
-        delta, slept = self._compute_delta(now)
+        self._check_day_boundary(now)
+
+        delta, slept = self._compute_delta()
 
         if slept:
             self._close_all_sessions()
@@ -247,9 +276,9 @@ class TrackerService(QObject):
 
     def _close_session(self, app_id: int, state: _SessionState, emit=True):
         now = datetime.now()
-        elapsed = int((now - state.start_time).total_seconds())
-        active = min(state.active_sec, elapsed)
-        background = min(state.background_sec, elapsed - active)
+        elapsed = max(0, int((now - state.start_time).total_seconds()))
+        active = min(max(0, state.active_sec), elapsed)
+        background = min(max(0, state.background_sec), max(0, elapsed - active))
         sess = Session(
             id=state.session_id,
             end_time=now,
@@ -273,9 +302,9 @@ class TrackerService(QObject):
             return
         now = datetime.now()
         for app_id, state in self._sessions.items():
-            elapsed = int((now - state.start_time).total_seconds())
-            active = min(state.active_sec, elapsed)
-            background = min(state.background_sec, elapsed - active)
+            elapsed = max(0, int((now - state.start_time).total_seconds()))
+            active = min(max(0, state.active_sec), elapsed)
+            background = min(max(0, state.background_sec), max(0, elapsed - active))
             self.repo.flush_session(
                 state.session_id,
                 active + background,

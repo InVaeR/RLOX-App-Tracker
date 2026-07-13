@@ -1,28 +1,35 @@
+# Python
 __pycache__/
 *.pyc
 *.pyo
-*.egg
 *.egg-info/
 dist/
-build/
-*.exe
-.env
+build/pyinstaller*/
+build/build/
+*.spec
+*.log
+
+# Virtual environment
 venv/
 .venv/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
+
+# App data (kept local)
 *.db
-*.db-shm
 *.db-wal
+*.db-shm
 config.json
 
-AUDIT.md
-PLAN.md
-repomix-output.md
-
-assets/app.ico
-version_info.txt
-
-# логи и IDE
-*.log
-.idea/
-.vscode/
-*.spec.bak
+# Installer output
+*.exe
+!app/assets/app.ico

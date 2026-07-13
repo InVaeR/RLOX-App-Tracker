@@ -114,6 +114,13 @@ class LiveCard(QFrame):
 
 
 class DashboardView(QWidget):
+    _PERIOD_LABELS = {
+        0: "сегодня",
+        1: "за неделю",
+        2: "за месяц",
+        3: "за всё время",
+    }
+
     def __init__(self, reporter: Reporter, on_add_app=None, parent=None):
         super().__init__(parent)
         self.reporter = reporter
@@ -141,7 +148,7 @@ class DashboardView(QWidget):
 
         cards_row = QGridLayout()
         cards_row.setSpacing(S.md)
-        self.card_total = StatCard("Всего сегодня", C.accent)
+        self.card_total = StatCard("Всего за период", C.accent)
         self.card_active = StatCard("Активное время", C.success)
         self.card_background = StatCard("Фоновое время", C.warning)
         self.card_running = StatCard("Запущено сейчас", C.text_muted)
@@ -258,11 +265,15 @@ class DashboardView(QWidget):
         self._btn_export.setEnabled(True)
 
     def _update_contents(self, stats):
-        has_data = any(
-            s.active_seconds + s.background_seconds > 0 for s in stats)
+        stats_with_data = [
+            s for s in stats
+            if s.active_seconds + s.background_seconds > 0
+        ]
+        has_data = bool(stats_with_data)
         self._chart_container.setVisible(has_data)
         self._legend.setVisible(has_data)
-        self._chart_container.set_stats(stats)
+        if has_data:
+            self._chart_container.set_stats(stats)
         self._update_cards(stats)
         self._update_table(stats)
 
@@ -270,6 +281,9 @@ class DashboardView(QWidget):
         total = sum(s.active_seconds + s.background_seconds for s in stats)
         active = sum(s.active_seconds for s in stats)
         background = total - active
+        idx = self.period_combo.currentIndex()
+        period_label = self._PERIOD_LABELS.get(idx, "")
+        self.card_total.set_title(f"Всего {period_label}")
         self.card_total.set_value(fmt_duration(total))
         self.card_active.set_value(
             fmt_duration(active),
@@ -294,15 +308,19 @@ class DashboardView(QWidget):
             self.card_top.set_value("—", "")
 
     def _update_table(self, stats):
-        if not stats:
+        stats_with_data = [
+            s for s in stats
+            if s.active_seconds + s.background_seconds > 0
+        ]
+        if not stats_with_data:
             self._content_stack.setCurrentWidget(self._empty)
             return
         self._content_stack.setCurrentWidget(self._table)
 
         sorting = self._table.isSortingEnabled()
         self._table.setSortingEnabled(False)
-        self._table.setRowCount(len(stats))
-        for i, s in enumerate(stats):
+        self._table.setRowCount(len(stats_with_data))
+        for i, s in enumerate(stats_with_data):
             name = s.display_name or s.process_name
             name_item = QTableWidgetItem(name)
             icon = get_app_icon(s.exe_path) if s.exe_path else None

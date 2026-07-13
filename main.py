@@ -2,7 +2,7 @@ import sys
 import os
 import logging
 
-from PySide6.QtWidgets import QApplication, QStyleFactory
+from PySide6.QtWidgets import QApplication, QStyleFactory, QMessageBox
 from PySide6.QtNetwork import QLocalSocket, QLocalServer
 
 from data.database import Database
@@ -25,12 +25,15 @@ def acquire_single_instance():
     if sock.waitForConnected(300):
         sock.disconnectFromServer()
         sock.close()
-        return None
+        return "already_running"
     QLocalServer.removeServer(_SINGLETON_KEY)
     server = QLocalServer()
     if not server.listen(_SINGLETON_KEY):
-        logger.warning("Не удалось занять singleton-сокет: %s",
-                       server.errorString())
+        logger.error(
+            "Не удалось занять singleton-сокет: %s",
+            server.errorString(),
+        )
+        return "error"
     return server
 
 
@@ -44,10 +47,24 @@ def main():
     app.setStyle(QStyleFactory.create("Fusion"))
     app.setStyleSheet(APP_QSS)
 
-    server = acquire_single_instance()
-    if server is None:
+    result = acquire_single_instance()
+    if result == "already_running":
         logger.warning("Приложение уже запущено — выход")
+        QMessageBox.information(
+            None, APP_NAME,
+            f"{APP_NAME} уже запущен.\n\n"
+            "В системе может быть только один экземпляр приложения."
+        )
         os._exit(0)
+    elif result == "error":
+        QMessageBox.critical(
+            None, APP_NAME,
+            "Не удалось запустить приложение: ошибка singleton-механизма.\n\n"
+            f"Попробуйте перезапустить {APP_NAME}."
+        )
+        os._exit(1)
+
+    server = result
     app._single_instance_server = server # type: ignore
 
     db = Database()
@@ -55,10 +72,19 @@ def main():
     config = ConfigManager()
 
     tracker = TrackerService(repo, config)
+
+    def cleanup():
+        logger.info("Cleanup: останов трекера и БД")
+        try:
+            tracker.stop()
+        finally:
+            db.close()
+
+    app.aboutToQuit.connect(cleanup)
+
     tracker.start()
 
     window = MainWindow(repo, tracker, config)
-    window.db = db # type: ignore
     window.show()
 
     exit_code = app.exec()
