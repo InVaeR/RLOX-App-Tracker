@@ -47,8 +47,7 @@ class NavButton(QPushButton):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, repo: Repository, tracker: TrackerService,
-                 config: ConfigManager):
+    def __init__(self, repo: Repository, tracker: TrackerService, config: ConfigManager):
         super().__init__()
         self.repo = repo
         self.tracker = tracker
@@ -63,11 +62,8 @@ class MainWindow(QMainWindow):
         reporter = Reporter(repo)
 
         self.dashboard_view = DashboardView(reporter, on_add_app=self._show_apps)
-        self.watchlist_view = WatchListView(watchlist_mgr, repo,
-                                            on_changed=self._on_watchlist_changed)
-        self.settings_view = SettingsView(config, repo,
-            on_settings_changed=self._on_settings_changed,
-            on_data_cleared=self._on_data_cleared)
+        self.watchlist_view = WatchListView(watchlist_mgr, repo, on_changed=self._on_watchlist_changed)
+        self.settings_view = SettingsView(config, repo, on_settings_changed=self._on_settings_changed, on_data_cleared=self._on_data_cleared)
 
         root = QWidget()
         root.setObjectName("root")
@@ -90,8 +86,7 @@ class MainWindow(QMainWindow):
         if not logo_pix.isNull():
             logo_icon.setPixmap(logo_pix)
         logo_text = QLabel(PRODUCT_NAME)
-        logo_text.setStyleSheet(
-            "font-size:18px; font-weight:700;")
+        logo_text.setStyleSheet("font-size:18px; font-weight:700;")
         logo_row_layout.addWidget(logo_icon)
         logo_row_layout.addWidget(logo_text)
         logo_row_layout.addStretch()
@@ -101,16 +96,13 @@ class MainWindow(QMainWindow):
         self.btn_dash = NavButton("Дашборд", "stats.png")
         self.btn_apps = NavButton("Приложения", "apps.png")
         self.btn_settings = NavButton("Настройки", "setting.png")
-        for i, b in enumerate(
-            [self.btn_dash, self.btn_apps, self.btn_settings]
-        ):
+        for i, b in enumerate([self.btn_dash, self.btn_apps, self.btn_settings]):
             self.nav_group.addButton(b, i)
             sb.addWidget(b)
         sb.addStretch()
 
         self.status_dot = QLabel("● Отслеживание активно")
-        self.status_dot.setStyleSheet(
-            f"color:{C.success}; font-size:12px; padding:8px 14px;")
+        self.status_dot.setStyleSheet(f"color:{C.success}; font-size:12px; padding:8px 14px;")
         sb.addWidget(self.status_dot)
 
         self.stack = FadeStack()
@@ -163,10 +155,9 @@ class MainWindow(QMainWindow):
 
     def _manual_check_update(self):
         from PySide6.QtWidgets import QMessageBox
+
         if not check_updates_interactive():
-            QMessageBox.information(
-                self, "Проверка обновлений",
-                "Лаунчер не найден. Обновления можно проверить только через установленную версию программы.")
+            QMessageBox.information(self, "Проверка обновлений", "Лаунчер не найден. Обновления можно проверить только через установленную версию программы.")
 
     def _nav_to(self, idx: int):
         self.nav_group.button(idx).setChecked(True)
@@ -184,9 +175,7 @@ class MainWindow(QMainWindow):
         self.repo.clear_all_data()
         self._watched_count = 0
         self.dashboard_view.refresh()
-        self.dashboard_view.update_live({"paused": self.tracker.is_paused,
-                                         "running_apps": [], "focused": None,
-                                         "focused_display": "", "focused_sec": 0})
+        self.dashboard_view.update_live({"paused": self.tracker.is_paused, "running_apps": [], "focused": None, "focused_display": "", "focused_sec": 0})
         self.watchlist_view.refresh()
 
     def _on_settings_changed(self):
@@ -199,23 +188,20 @@ class MainWindow(QMainWindow):
     def _on_tracking_paused(self):
         self._pause_action.setChecked(True)
         self.status_dot.setText("● Пауза")
-        self.status_dot.setStyleSheet(
-            f"color:{C.warning}; font-size:12px; padding:8px 14px;")
+        self.status_dot.setStyleSheet(f"color:{C.warning}; font-size:12px; padding:8px 14px;")
         self.pause_banner.show()
 
     def _on_tracking_resumed(self):
         self._pause_action.setChecked(False)
         self.status_dot.setText("● Отслеживание активно")
-        self.status_dot.setStyleSheet(
-            f"color:{C.success}; font-size:12px; padding:8px 14px;")
+        self.status_dot.setStyleSheet(f"color:{C.success}; font-size:12px; padding:8px 14px;")
         self.pause_banner.hide()
 
     def _refresh_status(self):
         if self.tracker.is_paused:
             self.statusBar().showMessage("Отслеживание приостановлено")
         else:
-            self.statusBar().showMessage(
-                f"Отслеживается приложений: {self._watched_count}")
+            self.statusBar().showMessage(f"Отслеживается приложений: {self._watched_count}")
 
     def _on_live_refresh(self):
         if self.stack.currentWidget() is self.dashboard_view:
@@ -254,8 +240,7 @@ class MainWindow(QMainWindow):
         elif info.get("focused"):
             name = info.get("focused_display") or info.get("focused")
             sec = info.get("focused_sec", 0)
-            self.tray_icon.setToolTip(
-                f"{PRODUCT_NAME} — {name} · {fmt_duration(sec, short=True)}")
+            self.tray_icon.setToolTip(f"{PRODUCT_NAME} — {name} · {fmt_duration(sec, short=True)}")
         else:
             self.tray_icon.setToolTip(PRODUCT_NAME)
 

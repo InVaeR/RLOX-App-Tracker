@@ -36,8 +36,7 @@ from rlox_app_tracker.utils.format import fmt_duration
 
 class NumericTableItem(QTableWidgetItem):
     def __lt__(self, other):
-        return (self.data(Qt.ItemDataRole.UserRole) or 0) < \
-               (other.data(Qt.ItemDataRole.UserRole) or 0)
+        return (self.data(Qt.ItemDataRole.UserRole) or 0) < (other.data(Qt.ItemDataRole.UserRole) or 0)
 
 
 class AddAppDialog(QDialog):
@@ -68,9 +67,7 @@ class AddAppDialog(QDialog):
         btn_browse = QPushButton("Обзор... (.exe)", self)
         btn_browse.clicked.connect(self._browse_exe)
         layout.addWidget(btn_browse)
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self
-        )
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -98,16 +95,11 @@ class AddAppDialog(QDialog):
 
     def _filter_apps(self, text: str):
         t = text.lower()
-        filtered = {
-            n: e for n, e in self._all_apps.items()
-            if not t or t in n.lower() or t in e.lower()
-        }
+        filtered = {n: e for n, e in self._all_apps.items() if not t or t in n.lower() or t in e.lower()}
         self._fill(filtered)
 
     def _browse_exe(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Выберите исполняемый файл", "", "Executable (*.exe)"
-        )
+        path, _ = QFileDialog.getOpenFileName(self, "Выберите исполняемый файл", "", "Executable (*.exe)")
         if path:
             self._selected_name = Path(path).name
             self._selected_exe = path
@@ -124,8 +116,7 @@ class AddAppDialog(QDialog):
 
 
 class WatchListView(QWidget):
-    def __init__(self, watchlist_manager: WatchListManager,
-                 repo: Repository = None, on_changed=None, parent=None):
+    def __init__(self, watchlist_manager: WatchListManager, repo: Repository = None, on_changed=None, parent=None):
         super().__init__(parent)
         self.manager = watchlist_manager
         self._repo = repo
@@ -148,14 +139,14 @@ class WatchListView(QWidget):
         self._empty = EmptyState(
             "Список пуст",
             "Добавьте приложения, время которых хотите отслеживать",
-            "＋ Добавить приложение", self._on_add,
+            "＋ Добавить приложение",
+            self._on_add,
             pixmap=asset_pixmap("apps.png", 64),
         )
         self._content_stack.addWidget(self._empty)
 
         self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(
-            ["Приложение", "Процесс", "Путь", "Сегодня"])
+        self.table.setHorizontalHeaderLabels(["Приложение", "Процесс", "Путь", "Сегодня"])
         hdr = self.table.horizontalHeader()
         hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
         hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
@@ -168,12 +159,10 @@ class WatchListView(QWidget):
         self.table.setShowGrid(False)
         self.table.verticalHeader().hide()
         self.table.setSortingEnabled(True)
-        self.table.setContextMenuPolicy(
-            Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._context_menu)
         self.table.cellDoubleClicked.connect(self._on_cell_dclick)
-        sc_del = QShortcut(QKeySequence(QKeySequence.StandardKey.Delete),
-                           self.table)
+        sc_del = QShortcut(QKeySequence(QKeySequence.StandardKey.Delete), self.table)
         sc_del.setContext(Qt.ShortcutContext.WidgetShortcut)
         sc_del.activated.connect(self._on_remove)
         self._content_stack.addWidget(self.table)
@@ -227,8 +216,7 @@ class WatchListView(QWidget):
             sec = today_map.get(app.process_name, 0)
             time_item = NumericTableItem(fmt_duration(sec, short=True))
             time_item.setData(Qt.ItemDataRole.UserRole, sec)
-            time_item.setFlags(
-                time_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            time_item.setFlags(time_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.table.setItem(i, 3, time_item)
 
         self.table.setSortingEnabled(sorting)
@@ -256,9 +244,7 @@ class WatchListView(QWidget):
             if name:
                 result = self.manager.add_app(name, exe, name)
                 if result == -1:
-                    QMessageBox.information(
-                        self, "Добавление",
-                        f"Приложение «{name}» уже в списке.")
+                    QMessageBox.information(self, "Добавление", f"Приложение «{name}» уже в списке.")
                 if self._on_changed:
                     self._on_changed()
                 self.refresh()
@@ -272,7 +258,8 @@ class WatchListView(QWidget):
     def _remove_row(self, row):
         app_id = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
         reply = QMessageBox.question(
-            self, "Подтверждение",
+            self,
+            "Подтверждение",
             "Удалить приложение и всю статистику по нему?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
@@ -289,10 +276,7 @@ class WatchListView(QWidget):
     def _rename_row(self, row):
         app_id = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
         current = self.table.item(row, 0).text()
-        new, ok = QInputDialog.getText(
-            self, "Переименовать",
-            "Отображаемое имя:", text=current
-        )
+        new, ok = QInputDialog.getText(self, "Переименовать", "Отображаемое имя:", text=current)
         if ok and new.strip() and self._repo:
             self._repo.update_display_name(app_id, new.strip())
             if self._on_changed:

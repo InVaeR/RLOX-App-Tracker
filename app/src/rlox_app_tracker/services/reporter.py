@@ -25,13 +25,14 @@ class Reporter:
     def export_csv(stats: List[AppStats], path: str):
         with open(path, "w", newline="", encoding="utf-8-sig") as f:
             w = csv.writer(f, delimiter=";")
-            w.writerow(["Приложение", "Процесс",
-                        "Активное (сек)", "Фоновое (сек)", "Сессий"])
+            w.writerow(["Приложение", "Процесс", "Активное (сек)", "Фоновое (сек)", "Сессий"])
             for s in stats:
-                w.writerow([
-                    s.display_name or s.process_name,
-                    s.process_name,
-                    s.active_seconds,
-                    s.background_seconds,
-                    s.session_count,
-                ])
+                w.writerow(
+                    [
+                        s.display_name or s.process_name,
+                        s.process_name,
+                        s.active_seconds,
+                        s.background_seconds,
+                        s.session_count,
+                    ]
+                )

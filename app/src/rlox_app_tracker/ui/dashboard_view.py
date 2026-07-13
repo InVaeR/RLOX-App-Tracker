@@ -34,8 +34,7 @@ from rlox_app_tracker.utils.pixmap import tint_pixmap
 
 class NumericItem(QTableWidgetItem):
     def __lt__(self, other):
-        return (self.data(Qt.ItemDataRole.UserRole) or 0) < \
-               (other.data(Qt.ItemDataRole.UserRole) or 0)
+        return (self.data(Qt.ItemDataRole.UserRole) or 0) < (other.data(Qt.ItemDataRole.UserRole) or 0)
 
 
 class LiveCard(QFrame):
@@ -66,17 +65,14 @@ class LiveCard(QFrame):
         texts = QVBoxLayout()
         texts.setSpacing(2)
         self._live_name = QLabel("Ожидание…")
-        self._live_name.setStyleSheet(
-            f"font-size:15px; font-weight:600; color:{C.text};")
+        self._live_name.setStyleSheet(f"font-size:15px; font-weight:600; color:{C.text};")
         self._live_detail = QLabel("Нет активного приложения")
-        self._live_detail.setStyleSheet(
-            f"font-size:12px; color:{C.text_muted};")
+        self._live_detail.setStyleSheet(f"font-size:12px; color:{C.text_muted};")
         texts.addWidget(self._live_name)
         texts.addWidget(self._live_detail)
 
         self._live_timer = QLabel("00:00")
-        self._live_timer.setStyleSheet(
-            f"font-size:20px; font-weight:700; color:{C.accent};")
+        self._live_timer.setStyleSheet(f"font-size:20px; font-weight:700; color:{C.accent};")
 
         ll.addWidget(self._pulse)
         ll.addLayout(texts, 1)
@@ -105,16 +101,14 @@ class LiveCard(QFrame):
             sec = info.get("focused_sec", 0)
             self._live_name.setText(display_name)
             if background:
-                bg_names = ", ".join(
-                    a.get("display_name", a["name"]) for a in background[:4])
+                bg_names = ", ".join(a.get("display_name", a["name"]) for a in background[:4])
                 self._live_detail.setText(f"Активно · В фоне: {bg_names}")
             else:
                 self._live_detail.setText("Активное окно")
             self._live_timer.setText(fmt_duration(sec))
             self._tint_pulse(C.success)
         elif background:
-            names = ", ".join(
-                a.get("display_name", a["name"]) for a in background[:5])
+            names = ", ".join(a.get("display_name", a["name"]) for a in background[:5])
             self._live_name.setText(f"В фоне: {len(background)}")
             self._live_detail.setText(names)
             self._live_timer.setText("—")
@@ -166,9 +160,7 @@ class DashboardView(QWidget):
         self.card_background = StatCard("Фоновое время", C.warning)
         self.card_running = StatCard("Запущено сейчас", C.text_muted)
         self.card_top = StatCard("Топ приложение", C.text)
-        for i, card in enumerate(
-            [self.card_total, self.card_active, self.card_background]
-        ):
+        for i, card in enumerate([self.card_total, self.card_active, self.card_background]):
             cards_row.addWidget(card, 0, i)
         for i, card in enumerate([self.card_running, self.card_top]):
             cards_row.addWidget(card, 1, i)
@@ -177,12 +169,10 @@ class DashboardView(QWidget):
         period_row = QHBoxLayout()
         period_row.setContentsMargins(0, 0, 0, 0)
         period_label = QLabel("Период:")
-        period_label.setStyleSheet(
-            f"color:{C.text_muted}; font-size:12px; font-weight:600;")
+        period_label.setStyleSheet(f"color:{C.text_muted}; font-size:12px; font-weight:600;")
         period_row.addWidget(period_label)
         self.period_combo = QComboBox()
-        self.period_combo.addItems(
-            ["Сегодня", "Неделя", "Месяц", "За всё время"])
+        self.period_combo.addItems(["Сегодня", "Неделя", "Месяц", "За всё время"])
         self.period_combo.currentIndexChanged.connect(self._on_period_change)
         period_row.addWidget(self.period_combo)
         period_row.addStretch()
@@ -208,8 +198,7 @@ class DashboardView(QWidget):
             pixmap=asset_pixmap("stats.png", 64),
         )
         self._table = QTableWidget(0, 4)
-        self._table.setHorizontalHeaderLabels(
-            ["Приложение", "Активное", "Фоновое", "Сессий"])
+        self._table.setHorizontalHeaderLabels(["Приложение", "Активное", "Фоновое", "Сессий"])
         hdr = self._table.horizontalHeader()
         hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
@@ -256,18 +245,13 @@ class DashboardView(QWidget):
         if not self._stats:
             return
         period = self.period_combo.currentText().replace(" ", "_").lower()
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Экспорт статистики",
-            f"rusloxpy_{period}.csv", "CSV (*.csv)")
+        path, _ = QFileDialog.getSaveFileName(self, "Экспорт статистики", f"rusloxpy_{period}.csv", "CSV (*.csv)")
         if not path:
             return
         try:
             self.reporter.export_csv(self._stats, path)
         except OSError as e:
-            QMessageBox.warning(
-                self, "Экспорт",
-                f"Не удалось сохранить файл:\n{e}\n\n"
-                "Возможно, файл открыт в другой программе.")
+            QMessageBox.warning(self, "Экспорт", f"Не удалось сохранить файл:\n{e}\n\nВозможно, файл открыт в другой программе.")
             return
         self._btn_export.setText("✓ Экспортировано")
         self._btn_export.setEnabled(False)
@@ -278,10 +262,7 @@ class DashboardView(QWidget):
         self._btn_export.setEnabled(True)
 
     def _update_contents(self, stats):
-        stats_with_data = [
-            s for s in stats
-            if s.active_seconds + s.background_seconds > 0
-        ]
+        stats_with_data = [s for s in stats if s.active_seconds + s.background_seconds > 0]
         has_data = bool(stats_with_data)
         self._chart_container.setVisible(has_data)
         self._legend.setVisible(has_data)
@@ -321,10 +302,7 @@ class DashboardView(QWidget):
             self.card_top.set_value("—", "")
 
     def _update_table(self, stats):
-        stats_with_data = [
-            s for s in stats
-            if s.active_seconds + s.background_seconds > 0
-        ]
+        stats_with_data = [s for s in stats if s.active_seconds + s.background_seconds > 0]
         if not stats_with_data:
             self._content_stack.setCurrentWidget(self._empty)
             return

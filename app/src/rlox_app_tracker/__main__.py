@@ -102,11 +102,16 @@ class SingleInstance(QObject):
 def write_startup_marker():
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     marker = STATE_DIR / f"startup-ok-{__version__}"
-    marker.write_text(json.dumps({
-        "version": __version__,
-        "pid": os.getpid(),
-        "timestamp": __import__("datetime").datetime.now().isoformat(),
-    }), encoding="utf-8")
+    marker.write_text(
+        json.dumps(
+            {
+                "version": __version__,
+                "pid": os.getpid(),
+                "timestamp": __import__("datetime").datetime.now().isoformat(),
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 def parse_args(argv=None):
@@ -149,11 +154,7 @@ def main(argv=None):
         sys.exit(0)
 
     if result == "error":
-        QMessageBox.critical(
-            None, PRODUCT_NAME,
-            "Не удалось запустить приложение: ошибка singleton-механизма.\n\n"
-            "Попробуйте перезапустить приложение."
-        )
+        QMessageBox.critical(None, PRODUCT_NAME, "Не удалось запустить приложение: ошибка singleton-механизма.\n\nПопробуйте перезапустить приложение.")
         os._exit(1)
 
     db = Database()

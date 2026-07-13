@@ -16,9 +16,7 @@ class Repository:
         )
         self.db.commit()
         if cur.rowcount == 0:
-            row = self.db.execute(
-                "SELECT id FROM watched_apps WHERE process_name = ?", (app.process_name,)
-            ).fetchone()
+            row = self.db.execute("SELECT id FROM watched_apps WHERE process_name = ?", (app.process_name,)).fetchone()
             return row["id"] if row else 0
         return cur.lastrowid or 0
 
@@ -31,15 +29,11 @@ class Repository:
         return [WatchedApp(**dict(r)) for r in rows]
 
     def get_watched_app_by_name(self, name: str) -> Optional[WatchedApp]:
-        row = self.db.execute(
-            "SELECT * FROM watched_apps WHERE process_name = ?", (name,)
-        ).fetchone()
+        row = self.db.execute("SELECT * FROM watched_apps WHERE process_name = ?", (name,)).fetchone()
         return WatchedApp(**dict(row)) if row else None
 
     def is_watched(self, process_name: str) -> bool:
-        row = self.db.execute(
-            "SELECT 1 FROM watched_apps WHERE process_name = ?", (process_name,)
-        ).fetchone()
+        row = self.db.execute("SELECT 1 FROM watched_apps WHERE process_name = ?", (process_name,)).fetchone()
         return row is not None
 
     def add_session(self, session: Session) -> int:
@@ -119,9 +113,7 @@ class Repository:
         return {r["process_name"]: r["total_seconds"] for r in rows}
 
     def update_display_name(self, app_id: int, name: str):
-        self.db.execute(
-            "UPDATE watched_apps SET display_name = ? WHERE id = ?", (name, app_id)
-        )
+        self.db.execute("UPDATE watched_apps SET display_name = ? WHERE id = ?", (name, app_id))
         self.db.commit()
 
     def clear_all_data(self):

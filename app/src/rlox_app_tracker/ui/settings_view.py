@@ -28,8 +28,7 @@ from rlox_app_tracker.version import __version__
 
 
 class SettingsView(QWidget):
-    def __init__(self, config: ConfigManager, repo: Repository = None,
-                 on_settings_changed=None, on_data_cleared=None, parent=None):
+    def __init__(self, config: ConfigManager, repo: Repository = None, on_settings_changed=None, on_data_cleared=None, parent=None):
         super().__init__(parent)
         self.config = config
         self._repo = repo
@@ -62,19 +61,16 @@ class SettingsView(QWidget):
         self.idle_spin = QSpinBox()
         self.idle_spin.setRange(1, 60)
         self.idle_spin.setSuffix(" мин")
-        self.idle_spin.setValue(
-            self.config.get_int("idle_threshold", DEFAULT_IDLE_THRESHOLD) // 60)
+        self.idle_spin.setValue(self.config.get_int("idle_threshold", DEFAULT_IDLE_THRESHOLD) // 60)
         tf.addRow("Порог простоя:", self.idle_spin)
         self.poll_spin = QDoubleSpinBox()
         self.poll_spin.setRange(0.5, 10.0)
         self.poll_spin.setSingleStep(0.5)
         self.poll_spin.setSuffix(" сек")
-        self.poll_spin.setValue(
-            self.config.get_float("poll_interval", DEFAULT_POLL_INTERVAL))
+        self.poll_spin.setValue(self.config.get_float("poll_interval", DEFAULT_POLL_INTERVAL))
         tf.addRow("Интервал опроса:", self.poll_spin)
         self.titles_check = QCheckBox()
-        self.titles_check.setChecked(
-            self.config.get_bool("save_window_titles", DEFAULT_SAVE_TITLES))
+        self.titles_check.setChecked(self.config.get_bool("save_window_titles", DEFAULT_SAVE_TITLES))
         tf.addRow("Сохранять заголовки окон:", self.titles_check)
         layout.addWidget(tracking)
 
@@ -82,15 +78,13 @@ class SettingsView(QWidget):
         bf = QFormLayout(behavior)
         bf.setSpacing(12)
         self.minimize_check = QCheckBox()
-        self.minimize_check.setChecked(
-            self.config.get_bool("minimize_to_tray", DEFAULT_MINIMIZE_TO_TRAY))
+        self.minimize_check.setChecked(self.config.get_bool("minimize_to_tray", DEFAULT_MINIMIZE_TO_TRAY))
         bf.addRow("Сворачивать в трей:", self.minimize_check)
         self.autostart_check = QCheckBox()
         self.autostart_check.setChecked(is_autostart_enabled())
         bf.addRow("Автозапуск с Windows:", self.autostart_check)
         self.updates_check = QCheckBox()
-        self.updates_check.setChecked(
-            self.config.get_bool("check_updates_on_start", True))
+        self.updates_check.setChecked(self.config.get_bool("check_updates_on_start", True))
         bf.addRow("Проверять обновления при запуске:", self.updates_check)
         layout.addWidget(behavior)
 
@@ -127,8 +121,7 @@ class SettingsView(QWidget):
         self._btn_update.setText("Проверка…")
         ok = check_updates_interactive()
         if not ok:
-            QMessageBox.information(self, "Обновление",
-                                   "Лаунчер не найден. Обновления можно проверить только через установленную версию программы.")
+            QMessageBox.information(self, "Обновление", "Лаунчер не найден. Обновления можно проверить только через установленную версию программы.")
         self._btn_update.setEnabled(True)
         self._btn_update.setText("Проверить обновления")
 
@@ -137,21 +130,22 @@ class SettingsView(QWidget):
         return box
 
     def _save(self):
-        self.config.update({
-            "idle_threshold": self.idle_spin.value() * 60,
-            "poll_interval": self.poll_spin.value(),
-            "save_window_titles": self.titles_check.isChecked(),
-            "minimize_to_tray": self.minimize_check.isChecked(),
-            "check_updates_on_start": self.updates_check.isChecked(),
-        })
+        self.config.update(
+            {
+                "idle_threshold": self.idle_spin.value() * 60,
+                "poll_interval": self.poll_spin.value(),
+                "save_window_titles": self.titles_check.isChecked(),
+                "minimize_to_tray": self.minimize_check.isChecked(),
+                "check_updates_on_start": self.updates_check.isChecked(),
+            }
+        )
         try:
             if self.autostart_check.isChecked():
                 enable_autostart()
             else:
                 disable_autostart()
         except OSError as e:
-            QMessageBox.warning(self, "Автозапуск",
-                               f"Не удалось изменить автозапуск:\n{e}")
+            QMessageBox.warning(self, "Автозапуск", f"Не удалось изменить автозапуск:\n{e}")
         if self._on_settings_changed:
             self._on_settings_changed()
         self._btn_save.setText("✓ Сохранено")
@@ -164,7 +158,8 @@ class SettingsView(QWidget):
 
     def _clear_data(self):
         reply = QMessageBox.warning(
-            self, "Очистка данных",
+            self,
+            "Очистка данных",
             "Вы уверены? Все данные о сессиях и приложениях будут удалены безвозвратно.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )

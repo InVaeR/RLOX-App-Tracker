@@ -71,8 +71,7 @@ class BarChartWidget(QWidget):
 
             label = fmt_duration(total_sec)
             painter.setPen(text_color)
-            painter.drawText(bx + a_w + b_w + self._gap, y, self._right - 4, bar_h,
-                             Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight, label)
+            painter.drawText(bx + a_w + b_w + self._gap, y, self._right - 4, bar_h, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight, label)
 
         painter.end()
 

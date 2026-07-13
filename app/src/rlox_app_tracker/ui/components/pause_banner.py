@@ -21,10 +21,7 @@ class PauseBanner(QFrame):
         lay.addWidget(QLabel("Отслеживание приостановлено"))
         lay.addStretch()
         btn = QPushButton("Возобновить")
-        btn.setStyleSheet(
-            f"background:{C.text}; color:{C.surface}; border:none; "
-            "border-radius:6px; padding:6px 14px;"
-        )
+        btn.setStyleSheet(f"background:{C.text}; color:{C.surface}; border:none; border-radius:6px; padding:6px 14px;")
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.clicked.connect(self.resume_clicked.emit)
         lay.addWidget(btn)

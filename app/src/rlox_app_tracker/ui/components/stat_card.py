@@ -13,9 +13,7 @@ class StatCard(QFrame):
         lay.setSpacing(S.xs)
 
         self._title = QLabel(title)
-        self._title.setStyleSheet(
-            f"color:{C.text_muted}; font-size:12px; font-weight:600;"
-        )
+        self._title.setStyleSheet(f"color:{C.text_muted}; font-size:12px; font-weight:600;")
 
         self._value = QLabel("—")
         self._value.setStyleSheet(f"color:{accent}; font-size:28px; font-weight:700;")

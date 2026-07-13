@@ -4,6 +4,7 @@ LauncherBridge — интерфейс между приложением и RLOXL
 Приложение не должно напрямую проверять обновления или управлять установкой.
 Все операции с обновлениями делегируются лаунчеру.
 """
+
 import logging
 import subprocess
 from pathlib import Path
@@ -16,6 +17,7 @@ def _find_launcher() -> Optional[Path]:
     import sys
 
     from rlox_app_tracker.paths import APP_DIR
+
     candidates = [
         APP_DIR / "RLOXLauncher.exe",
         APP_DIR.parent / "RLOXLauncher.exe",

@@ -103,14 +103,16 @@ class TrackerService(QObject):
         self.tracking_resumed.emit()
 
     def _emit_paused_info(self):
-        self.active_app_info.emit({
-            "paused": True,
-            "running_apps": [],
-            "background_apps": [],
-            "focused": None,
-            "focused_display": "",
-            "focused_sec": 0,
-        })
+        self.active_app_info.emit(
+            {
+                "paused": True,
+                "running_apps": [],
+                "background_apps": [],
+                "focused": None,
+                "focused_display": "",
+                "focused_sec": 0,
+            }
+        )
 
     @property
     def is_paused(self) -> bool:
@@ -157,10 +159,7 @@ class TrackerService(QObject):
         watched_apps = self._get_watched_apps()
         watched_ids = {a.id: a for a in watched_apps if a.id}
 
-        watched_running = [
-            {"name": a.process_name, "display_name": a.display_name or a.process_name}
-            for a in watched_apps if a.process_name in running_names
-        ]
+        watched_running = [{"name": a.process_name, "display_name": a.display_name or a.process_name} for a in watched_apps if a.process_name in running_names]
         focused_app_id = None
         focused_sec = 0
         focused_display = ""
@@ -181,12 +180,19 @@ class TrackerService(QObject):
         ]
 
         return _TickContext(
-            now=now, delta=delta, slept=slept,
-            idle_now=idle_now, focused_name=focused_name,
-            focused_app_id=focused_app_id, focused_display=focused_display,
-            focused_sec=focused_sec, running_names=running_names,
-            watched_apps=watched_apps, watched_ids=watched_ids,
-            watched_running=watched_running, background_apps=background_apps,
+            now=now,
+            delta=delta,
+            slept=slept,
+            idle_now=idle_now,
+            focused_name=focused_name,
+            focused_app_id=focused_app_id,
+            focused_display=focused_display,
+            focused_sec=focused_sec,
+            running_names=running_names,
+            watched_apps=watched_apps,
+            watched_ids=watched_ids,
+            watched_running=watched_running,
+            background_apps=background_apps,
             window=window,
         )
 
@@ -207,8 +213,7 @@ class TrackerService(QObject):
                 title = ctx.window["title"] if is_focused and self._save_titles else ""
                 sess = Session(app_id=app.id, start_time=ctx.now, window_title=title)
                 sid = self.repo.add_session(sess)
-                self._sessions[app.id] = _SessionState(
-                    session_id=sid, start_time=ctx.now, title=title)
+                self._sessions[app.id] = _SessionState(session_id=sid, start_time=ctx.now, title=title)
 
             state = self._sessions[app.id]
             delta_int = int(ctx.delta)
@@ -232,14 +237,16 @@ class TrackerService(QObject):
                 self._close_session(app_id, state)
 
     def _emit_live_info(self, ctx: _TickContext):
-        self.active_app_info.emit({
-            "paused": self._paused,
-            "running_apps": ctx.watched_running,
-            "background_apps": ctx.background_apps,
-            "focused": ctx.focused_name if ctx.focused_app_id is not None else None,
-            "focused_display": ctx.focused_display,
-            "focused_sec": ctx.focused_sec,
-        })
+        self.active_app_info.emit(
+            {
+                "paused": self._paused,
+                "running_apps": ctx.watched_running,
+                "background_apps": ctx.background_apps,
+                "focused": ctx.focused_name if ctx.focused_app_id is not None else None,
+                "focused_display": ctx.focused_display,
+                "focused_sec": ctx.focused_sec,
+            }
+        )
 
     def _check_day_boundary(self, now: datetime):
         today = now.date().isoformat()

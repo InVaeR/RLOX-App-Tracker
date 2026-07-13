@@ -13,9 +13,6 @@ class Legend(QWidget):
         lay.addStretch()
 
     def _dot(self, color, text):
-        w = QLabel(
-            f"<span style='color:{color}'>●</span> "
-            f"<span style='color:{C.text_muted}'>{text}</span>"
-        )
+        w = QLabel(f"<span style='color:{color}'>●</span> <span style='color:{C.text_muted}'>{text}</span>")
         w.setStyleSheet("font-size:12px;")
         return w

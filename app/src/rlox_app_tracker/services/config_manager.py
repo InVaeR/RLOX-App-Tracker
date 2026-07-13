@@ -17,6 +17,7 @@ class ConfigManager:
 
     def _migrate_old(self):
         from rlox_app_tracker.paths import APP_DIR
+
         old = APP_DIR / "config.json"
         if old.exists() and not self._path.exists():
             try:

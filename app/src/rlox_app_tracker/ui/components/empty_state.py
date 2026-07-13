@@ -6,9 +6,7 @@ from rlox_app_tracker.ui.theme import PALETTE as C
 
 
 class EmptyState(QWidget):
-    def __init__(self, title: str, subtitle: str,
-                 button_text: str = "", on_click=None,
-                 pixmap: QPixmap = None, emoji: str = ""):
+    def __init__(self, title: str, subtitle: str, button_text: str = "", on_click=None, pixmap: QPixmap = None, emoji: str = ""):
         super().__init__()
         lay = QVBoxLayout(self)
         lay.setAlignment(Qt.AlignmentFlag.AlignCenter)

@@ -1,6 +1,7 @@
 """
 Миграция данных из старого RusLOXPy в RLOX App Tracker.
 """
+
 import json
 import logging
 import shutil
@@ -87,9 +88,7 @@ def _write_marker(success: bool, details: str = ""):
         "source_version": "1.x",
         "target_version": "2.0.0",
     }
-    MIGRATION_MARKER.write_text(
-        json.dumps(marker, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    MIGRATION_MARKER.write_text(json.dumps(marker, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def needs_migration() -> bool:

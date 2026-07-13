@@ -42,8 +42,7 @@ class AppItemDelegate(QStyledItemDelegate):
         painter.setFont(f)
         fm = painter.fontMetrics()
         name_el = fm.elidedText(name, Qt.TextElideMode.ElideRight, text_w)
-        painter.drawText(text_x, rect.top() + 12, text_w, 18,
-                         Qt.AlignmentFlag.AlignVCenter, name_el)
+        painter.drawText(text_x, rect.top() + 12, text_w, 18, Qt.AlignmentFlag.AlignVCenter, name_el)
 
         painter.setPen(QColor(C.text_dim))
         f2 = QFont(painter.font())
@@ -52,7 +51,6 @@ class AppItemDelegate(QStyledItemDelegate):
         painter.setFont(f2)
         fm2 = painter.fontMetrics()
         exe_el = fm2.elidedText(exe, Qt.TextElideMode.ElideMiddle, text_w)
-        painter.drawText(text_x, rect.top() + 30, text_w, 16,
-                         Qt.AlignmentFlag.AlignVCenter, exe_el)
+        painter.drawText(text_x, rect.top() + 30, text_w, 16, Qt.AlignmentFlag.AlignVCenter, exe_el)
 
         painter.restore()
