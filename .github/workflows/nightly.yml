@@ -13,11 +13,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r app/requirements-dev.txt
-      - name: Run tests
+      - name: Run Python tests
         run: python -m pytest app/tests/ -v
+      - name: Run launcher tests
+        run: dotnet test launcher/tests/RLOXLauncher.Tests.csproj --verbosity normal
+      - name: Build launcher
+        run: dotnet build launcher/src/RLOXLauncher/RLOXLauncher.csproj
       - name: Build app
         run: pyinstaller app/RLOXAppTracker.spec --noconfirm

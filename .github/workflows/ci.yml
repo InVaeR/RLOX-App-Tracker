@@ -42,5 +42,7 @@ jobs:
         run: python -m pytest app/tests/ -v
       - name: Build launcher
         run: dotnet build launcher/src/RLOXLauncher/RLOXLauncher.csproj
+      - name: Run launcher tests
+        run: dotnet test launcher/tests/RLOXLauncher.Tests.csproj --verbosity normal
       - name: Build app (PyInstaller)
         run: pyinstaller app/RLOXAppTracker.spec --noconfirm

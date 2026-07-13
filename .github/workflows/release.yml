@@ -21,6 +21,17 @@ jobs:
           $tag = "${{ github.ref_name }}"
           $ver = $tag -replace "^v", ""
           echo "version=$ver" >> $env:GITHUB_OUTPUT
+          # Numeric version for Windows file version (major.minor.patch.build)
+          $parts = $ver -split '-'
+          $base = $parts[0]
+          if ($parts.Length -gt 1 -and $parts[1] -match 'alpha\.(\d+)') {
+            $numVer = "$base.$($matches[1])"
+          } elseif ($parts.Length -gt 1 -and $parts[1] -match 'beta\.(\d+)') {
+            $numVer = "$base.$($matches[1])"
+          } else {
+            $numVer = "$base.0"
+          }
+          echo "version_numeric=$numVer" >> $env:GITHUB_OUTPUT
 
       - name: Check tag matches version.py
         run: |
@@ -29,6 +40,23 @@ jobs:
             Write-Error "Tag mismatch: release tag ${{ github.ref_name }} != version.py v$ver"
             exit 1
           }
+
+      - name: Determine prerelease status
+        id: channel
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if ($tag -match '-alpha') {
+            echo "prerelease=true" >> $env:GITHUB_OUTPUT
+          } elseif ($tag -match '-beta') {
+            echo "prerelease=true" >> $env:GITHUB_OUTPUT
+          } elseif ($tag -match '-rc') {
+            echo "prerelease=true" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "prerelease=false" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
 
       - name: Install dependencies
         run: |
@@ -40,7 +68,7 @@ jobs:
           ruff check app/src/ app/tests/
           ruff format --check app/src/ app/tests/
 
-      - name: Run tests
+      - name: Run Python tests
         run: python -m pytest app/tests/ -v
 
       - name: Build app
@@ -59,6 +87,9 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Run launcher tests
+        run: dotnet test launcher/tests/RLOXLauncher.Tests.csproj --verbosity normal
+
       - name: Build launcher
         run: |
           dotnet publish launcher/src/RLOXLauncher/RLOXLauncher.csproj `
@@ -75,7 +106,7 @@ jobs:
             Write-Error "Inno Setup 6 not found — installer build required for release"
             exit 1
           }
-          & $iscc "/DAppVersion=${{ steps.version.outputs.version }}" installer/RLOXAppTracker.iss
+          & $iscc "/DAppVersion=${{ steps.version.outputs.version }}" "/DAppVersionNumeric=${{ steps.version.outputs.version_numeric }}" installer/RLOXAppTracker.iss
 
       - name: Generate SHA-256
         run: |
@@ -98,7 +129,7 @@ jobs:
         with:
           name: "v${{ steps.version.outputs.version }}"
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.channel.outputs.prerelease }}
           files: |
             dist/RLOX-App-Tracker-Setup-*.exe
             dist/SHA256SUMS.txt

@@ -4,12 +4,18 @@ from pathlib import Path
 
 block_cipher = None
 
+APP_ROOT = Path(SPECPATH).resolve()
+REPO_ROOT = APP_ROOT.parent
+SRC_ROOT = APP_ROOT / "src"
+ASSETS_ROOT = REPO_ROOT / "assets"
+VERSION_INFO = REPO_ROOT / "version_info.txt"
+
 a = Analysis(
-    ['src/rlox_app_tracker/__main__.py'],
-    pathex=[],
+    [str(SRC_ROOT / 'rlox_app_tracker' / '__main__.py')],
+    pathex=[str(SRC_ROOT)],
     binaries=[],
     datas=[
-        ('../assets', 'assets'),
+        (str(ASSETS_ROOT), 'assets'),
     ],
     hiddenimports=[
         'win32gui',
@@ -36,9 +42,7 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
-    [],
+    exclude_binaries=True,
     name='RLOXAppTracker',
     debug=False,
     bootloader_ignore_signals=False,
@@ -52,7 +56,8 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='../assets/app.ico',
+    icon=str(ASSETS_ROOT / 'app.ico'),
+    version=str(VERSION_INFO),
 )
 
 coll = COLLECT(

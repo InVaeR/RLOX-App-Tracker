@@ -72,7 +72,7 @@ internal class UpdateManifest
         {
             return can > cur;
         }
-        return string.Compare(candidate, current, StringComparison.OrdinalIgnoreCase) > 0;
+        return false;
     }
 
     public bool IsValid(string configChannel)
@@ -91,7 +91,7 @@ internal class UpdateManifest
         if (!string.IsNullOrEmpty(MinimumLauncherVersion))
         {
             if (!SemVersion.TryParse(MinimumLauncherVersion, out var minLauncher)) return false;
-            if (!SemVersion.TryParse(typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0", out var launcherVer)) return false;
+            if (!SemVersion.TryParse(Program.AppVersion, out var launcherVer)) return false;
             if (launcherVer < minLauncher) return false;
         }
         if (!string.IsNullOrEmpty(Channel) && !string.Equals(Channel, configChannel, StringComparison.OrdinalIgnoreCase))

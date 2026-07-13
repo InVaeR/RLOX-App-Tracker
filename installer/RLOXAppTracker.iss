@@ -13,7 +13,7 @@ AppName={#MyAppName}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppVersion={#AppVersion}
-VersionInfoVersion={#AppVersion}
+VersionInfoVersion={#AppVersionNumeric}
 DefaultDirName={localappdata}\Programs\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
@@ -35,7 +35,7 @@ Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 Source: "..\dist\launcher\{#MyLauncherExeName}"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Версия приложения
-Source: "..\dist\app\versions\{#AppVersion}\*"; DestDir: "{app}\versions\{#AppVersion}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\RLOXAppTracker\*"; DestDir: "{app}\versions\{#AppVersion}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Dirs]
 Name: "{app}\versions"
@@ -52,7 +52,7 @@ Name: "desktopicon"; Description: "Создать ярлык на рабочем
 Name: "autostart"; Description: "Запускать вместе с Windows"; GroupDescription: "Автозапуск:"
 
 [Run]
-Filename: "{app}\{#MyLauncherExeName}"; Parameters: "--launch"; Description: "Запустить {#MyAppName}"; Flags: postinstall nowait
+Filename: "{app}\{#MyLauncherExeName}"; Parameters: "--launch --after-update"; Description: "Запустить {#MyAppName}"; Flags: postinstall nowait
 
 [Registry]
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#MyAutostartValue}"; ValueData: """{app}\{#MyLauncherExeName}"" --launch --background"; Tasks: autostart; Flags: uninsdeletevalue
@@ -61,16 +61,18 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 Filename: "{app}\{#MyLauncherExeName}"; Parameters: "--shutdown"; Flags: runhidden waituntilterminated
 
 [UninstallDelete]
-Type: filesifnotempty; Name: "{app}\state\install.json"
+Type: files; Name: "{app}\state\install.json"
+Type: files; Name: "{app}\state\install.json.bak"
 Type: dirifempty; Name: "{app}\state"
 Type: dirifempty; Name: "{app}\versions"
-Type: filesifnotempty; Name: "{app}\launcher.version"
+Type: files; Name: "{app}\launcher.version"
 Type: dirifempty; Name: "{app}"
 
 [Code]
 var
   DataPage: TInputOptionWizardPage;
   DataPath: string;
+  ProductDataRoot: string;
   InstallStatePath: string;
   OldDataFound: Boolean;
   IsUpdate: Boolean;
@@ -84,7 +86,7 @@ var
 begin
   Result := '';
   if not FileExists(FilePath) then Exit;
-  Content := LoadStringFromFile(FilePath);
+  if not LoadStringFromFile(FilePath, Content) then Exit;
   QuotePos := Pos('"currentVersion"', Content);
   if QuotePos = 0 then Exit;
   QuotePos := Pos('"', Copy(Content, QuotePos + 16, 50));
@@ -94,10 +96,27 @@ begin
   Result := Copy(Content, QuotePos + 1, EndQuotePos - 1);
 end;
 
+function GetChannelFromVersion(const Version: string): string;
+begin
+  if Pos('alpha', LowerCase(Version)) > 0 then
+    Result := 'dev'
+  else if Pos('beta', LowerCase(Version)) > 0 then
+    Result := 'beta'
+  else
+    Result := 'stable';
+end;
+
+function EscapeBackslash(const S: string): string;
+begin
+  Result := S;
+  StringChange(Result, '\', '\\');
+end;
+
 function InitializeSetup: Boolean;
 begin
   Result := True;
   DataPath := ExpandConstant('{localappdata}') + '\RLOX App Tracker\data';
+  ProductDataRoot := ExpandConstant('{localappdata}') + '\RLOX App Tracker';
   InstallStatePath := ExpandConstant('{localappdata}\Programs\RLOX App Tracker\state\install.json');
   OldDataFound := DirExists(DataPath);
   IsUpdate := CmdLineParamExists('/UPDATE');
@@ -110,17 +129,20 @@ procedure WriteInstallJson;
 var
   Json: string;
   StateDir: string;
+  EscapedExe: string;
 begin
   StateDir := ExpandConstant('{localappdata}\Programs\RLOX App Tracker\state');
   ForceDirectories(StateDir);
+  EscapedExe := EscapeBackslash('versions\{#AppVersion}\{#MyAppExeName}');
 
   Json := '{' + #13#10 +
           '  "schemaVersion": 1,' + #13#10 +
           '  "currentVersion": "{#AppVersion}",' + #13#10 +
           '  "previousVersion": "' + PrevVersion + '",' + #13#10 +
-          '  "channel": "stable",' + #13#10 +
+          '  "pendingVersion": "",' + #13#10 +
+          '  "channel": "' + GetChannelFromVersion('{#AppVersion}') + '",' + #13#10 +
           '  "installedAt": "' + GetDateTimeString('yyyy-mm-dd", "hh:nn:ss', '-', ':') + '",' + #13#10 +
-          '  "appExecutable": "versions\{#AppVersion}\{#MyAppExeName}"' + #13#10 +
+          '  "appExecutable": "' + EscapedExe + '"' + #13#10 +
           '}';
 
   SaveStringToFile(StateDir + '\install.json', Json, False);
@@ -147,7 +169,7 @@ begin
     begin
       Answer := MsgBox('Удалить также статистику и настройки?', mbConfirmation, MB_YESNO or MB_DEFBUTTON2);
       if Answer = IDYES then
-        DelTree(DataPath, True, True, True);
+        DelTree(ProductDataRoot, True, True, True);
     end;
   end;
 end;
@@ -158,6 +180,8 @@ var
   LauncherExe: string;
 begin
   Result := True;
+  DataPath := ExpandConstant('{localappdata}') + '\RLOX App Tracker\data';
+  ProductDataRoot := ExpandConstant('{localappdata}') + '\RLOX App Tracker';
   LauncherExe := ExpandConstant('{app}\{#MyLauncherExeName}');
   if FileExists(LauncherExe) then
   begin

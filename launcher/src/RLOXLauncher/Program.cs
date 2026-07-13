@@ -1,12 +1,10 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Windows.Forms;
 
 namespace RLOXLauncher;
 
 internal class Program
 {
-    private const string AppVersion = "2.0.0.0";
+    internal const string AppVersion = "2.0.0";
     private const string ManifestUrl = "https://github.com/InVaeR/RLOX-App-Tracker/releases/latest/download/latest.json";
 
     private static void Main(string[] args)
@@ -64,7 +62,7 @@ internal class Program
 
         // Read install state
         var installState = InstallState.Load(AppPaths.InstallJsonPath);
-        Logger.Info($"Current version: {installState.CurrentVersion ?? "none"}");
+        Logger.Info($"Effective version: {installState.EffectiveVersion ?? "none"}");
 
         // --repair: re-check startup marker, purge failed version
         if (opts.Repair)
@@ -72,15 +70,28 @@ internal class Program
             HandleRepair(installState);
         }
 
-        // Check startup marker — if current version failed, roll back
-        if (!opts.UpdateOnly && installState.CurrentVersion != null)
+        // Pending version rollback: only rollback if startup marker is absent
+        // AND the version was already attempted (LaunchAttemptedAt is set)
+        if (!opts.UpdateOnly && installState.PendingVersion != null)
         {
-            var rolledBack = CheckStartupMarkerAndRollback(installState);
-            if (rolledBack) installState = InstallState.Load(AppPaths.InstallJsonPath);
+            if (installState.LaunchAttemptedAt != null)
+            {
+                if (CheckPendingVersionFailed(installState))
+                {
+                    installState = InstallState.Load(AppPaths.InstallJsonPath);
+                }
+            }
         }
 
-        // Clean up old versions (keep only current + previous)
-        CleanupOldVersions(installState);
+        // Clean up old versions (keep only effective + previous)
+        if (installState.IsValid())
+        {
+            CleanupOldVersions(installState);
+        }
+        else
+        {
+            Logger.Warn("Install state is invalid — skipping cleanup to prevent data loss");
+        }
 
         // --launch or default: if app already running, just activate it
         if (opts.Launch)
@@ -114,9 +125,9 @@ internal class Program
                 }
                 else
                 {
-                Logger.Info($"Manifest version: {manifest.Version}, current: {installState.CurrentVersion}");
+                Logger.Info($"Manifest version: {manifest.Version}, current: {installState.EffectiveVersion}");
 
-                var hasUpdate = UpdateManifest.IsNewerVersion(installState.CurrentVersion, manifest.Version);
+                var hasUpdate = UpdateManifest.IsNewerVersion(installState.EffectiveVersion, manifest.Version);
 
                 if (hasUpdate)
                 {
@@ -129,7 +140,7 @@ internal class Program
 
                     if (!shouldInstall && opts.Interactive)
                     {
-                        shouldInstall = ShowUpdateDialog(installState.CurrentVersion ?? "unknown", manifest);
+                        shouldInstall = ShowUpdateDialog(installState.EffectiveVersion ?? "unknown", manifest);
                     }
 
                     if (!shouldInstall && !opts.Interactive && !opts.CheckUpdates)
@@ -140,6 +151,13 @@ internal class Program
 
                     if (shouldInstall)
                     {
+                        // Mark the new version as pending before installing
+                        installState.PendingVersion = manifest.Version;
+                        installState.LaunchAttemptedAt = null;
+                        installState.StartupConfirmed = false;
+                        installState.AppExecutable = $"versions\\{manifest.Version}\\RLOXAppTracker.exe";
+                        installState.Save(AppPaths.InstallJsonPath);
+
                         var success = await PerformUpdate(manifest, installState, config, opts);
                         if (!success)
                         {
@@ -188,27 +206,48 @@ internal class Program
             return;
         }
 
+        // Record launch attempt for pending version
+        if (installState.PendingVersion != null)
+        {
+            installState.LaunchAttemptedAt = DateTime.Now.ToString("o");
+            installState.Save(AppPaths.InstallJsonPath);
+        }
+
         Logger.Info($"Launching app: {exePath}");
         AppLauncher.Launch(exePath, opts.Background, opts.AfterUpdate);
     }
 
     private static void HandleRepair(InstallState installState)
     {
-        var current = installState.CurrentVersion;
-        if (current != null)
+        var ver = installState.PendingVersion ?? installState.CurrentVersion;
+        if (ver != null)
         {
-            var marker = Path.Combine(AppPaths.StateDir, $"startup-ok-{current}");
+            var marker = Path.Combine(AppPaths.StateDir, $"startup-ok-{ver}");
             if (!File.Exists(marker))
             {
-                Logger.Warn($"Repair: startup marker missing for version {current}");
-                var prev = installState.PreviousVersion;
-                if (prev != null)
+                Logger.Warn($"Repair: startup marker missing for version {ver}");
+                if (installState.PendingVersion != null)
                 {
-                    Logger.Info($"Repair: rolling back to {prev}");
-                    installState.CurrentVersion = prev;
-                    installState.PreviousVersion = null;
-                    installState.AppExecutable = $"versions\\{installState.CurrentVersion}\\RLOXAppTracker.exe";
+                    // Clear pending — revert to current
+                    installState.PendingVersion = null;
+                    installState.LaunchAttemptedAt = null;
+                    installState.AppExecutable = installState.CurrentVersion != null
+                        ? $"versions\\{installState.CurrentVersion}\\RLOXAppTracker.exe"
+                        : null;
                     installState.Save(AppPaths.InstallJsonPath);
+                    Logger.Info("Repair: cleared pending version");
+                }
+                else
+                {
+                    var prev = installState.PreviousVersion;
+                    if (prev != null)
+                    {
+                        Logger.Info($"Repair: rolling back to {prev}");
+                        installState.CurrentVersion = prev;
+                        installState.PreviousVersion = null;
+                        installState.AppExecutable = $"versions\\{installState.CurrentVersion}\\RLOXAppTracker.exe";
+                        installState.Save(AppPaths.InstallJsonPath);
+                    }
                 }
             }
             else
@@ -219,47 +258,49 @@ internal class Program
     }
 
     /// <summary>
-    /// Checks startup-ok marker for the current version.
-    /// If missing, the previous launch failed — roll back to previous version.
+    /// Checks if the pending version has failed (startup marker absent after launch attempt).
+    /// If so, reverts to the former current version.
     /// </summary>
-    private static bool CheckStartupMarkerAndRollback(InstallState installState)
+    private static bool CheckPendingVersionFailed(InstallState installState)
     {
-        var current = installState.CurrentVersion;
-        if (current == null) return false;
+        var pending = installState.PendingVersion;
+        if (pending == null) return false;
 
-        var marker = Path.Combine(AppPaths.StateDir, $"startup-ok-{current}");
-        if (!File.Exists(marker))
+        var marker = Path.Combine(AppPaths.StateDir, $"startup-ok-{pending}");
+        if (File.Exists(marker))
         {
-            Logger.Warn($"Startup marker not found for version {current} — possible crash");
-
-            var prev = installState.PreviousVersion;
-            if (prev != null)
-            {
-                Logger.Info($"Rolling back to version {prev}");
-
-                var prevExe = Path.Combine(AppPaths.VersionsDir, prev, "RLOXAppTracker.exe");
-                if (File.Exists(prevExe))
-                {
-                    installState.CurrentVersion = prev;
-                    installState.PreviousVersion = null;
-                    installState.AppExecutable = $"versions\\{installState.CurrentVersion}\\RLOXAppTracker.exe";
-                    installState.Save(AppPaths.InstallJsonPath);
-                    Logger.Info($"Rolled back to version {installState.CurrentVersion}");
-                    return true;
-                }
-
-                Logger.Warn("Previous version files not found, cannot roll back");
-            }
-            else
-            {
-                Logger.Warn("No previous version to roll back to");
-            }
+            Logger.Info($"Pending version {pending} confirmed — promoting to current");
+            // Promote pending to current
+            if (installState.CurrentVersion != null)
+                installState.PreviousVersion = installState.CurrentVersion;
+            installState.CurrentVersion = pending;
+            installState.PendingVersion = null;
+            installState.LaunchAttemptedAt = null;
+            installState.StartupConfirmed = true;
+            installState.AppExecutable = $"versions\\{installState.CurrentVersion}\\RLOXAppTracker.exe";
+            installState.Save(AppPaths.InstallJsonPath);
+            return false;
         }
+
+        Logger.Warn($"Pending version {pending} launched but startup marker absent — possible crash");
+
+        var current = installState.CurrentVersion;
+        if (current != null)
+        {
+            Logger.Info($"Reverting from pending {pending} to current {current}");
+            installState.PendingVersion = null;
+            installState.LaunchAttemptedAt = null;
+            installState.AppExecutable = $"versions\\{current}\\RLOXAppTracker.exe";
+            installState.Save(AppPaths.InstallJsonPath);
+            return true;
+        }
+
+        Logger.Warn("No current version to revert to — keeping pending");
         return false;
     }
 
     /// <summary>
-    /// Removes version directories older than the current and previous versions.
+    /// Removes version directories older than the effective and previous versions.
     /// </summary>
     private static void CleanupOldVersions(InstallState installState)
     {
@@ -267,8 +308,8 @@ internal class Program
         if (!Directory.Exists(versionsDir)) return;
 
         var keep = new HashSet<string>();
-        if (installState.CurrentVersion != null)
-            keep.Add(installState.CurrentVersion);
+        if (installState.EffectiveVersion != null)
+            keep.Add(installState.EffectiveVersion);
         if (installState.PreviousVersion != null)
             keep.Add(installState.PreviousVersion);
 
@@ -443,69 +484,4 @@ internal class Program
     }
 }
 
-/// <summary>
-/// Represents the install.json state file.
-/// </summary>
-internal class InstallState
-{
-    [JsonPropertyName("schemaVersion")]
-    public int SchemaVersion { get; set; }
 
-    [JsonPropertyName("currentVersion")]
-    public string? CurrentVersion { get; set; }
-
-    [JsonPropertyName("previousVersion")]
-    public string? PreviousVersion { get; set; }
-
-    [JsonPropertyName("channel")]
-    public string? Channel { get; set; }
-
-    [JsonPropertyName("installedAt")]
-    public string? InstalledAt { get; set; }
-
-    [JsonPropertyName("appExecutable")]
-    public string? AppExecutable { get; set; }
-
-    public static InstallState Load(string path)
-    {
-        if (File.Exists(path))
-        {
-            try
-            {
-                var json = File.ReadAllText(path);
-                return JsonSerializer.Deserialize<InstallState>(json) ?? new InstallState();
-            }
-            catch (Exception ex)
-            {
-                Logger.Error("Failed to load install state", ex);
-            }
-        }
-        return new InstallState();
-    }
-
-    private static readonly JsonSerializerOptions JsonWriteOpts = new()
-    {
-        WriteIndented = true,
-    };
-
-    public void Save(string path)
-    {
-        var dir = Path.GetDirectoryName(path);
-        if (dir != null) Directory.CreateDirectory(dir);
-        var tmp = path + ".tmp";
-        File.WriteAllText(tmp, JsonSerializer.Serialize(this, JsonWriteOpts));
-        File.Replace(tmp, path, null);
-    }
-
-    public string? GetAppExePath()
-    {
-        if (AppExecutable != null)
-        {
-            var fullPath = Path.Combine(AppPaths.InstallDir, AppExecutable);
-            if (File.Exists(fullPath)) return fullPath;
-        }
-
-        // Fallback: find latest version directory
-        return AppLauncher.GetAppExePath(CurrentVersion);
-    }
-}
