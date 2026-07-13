@@ -1,4 +1,5 @@
 """Тесты модуля миграции."""
+
 import json
 from pathlib import Path
 

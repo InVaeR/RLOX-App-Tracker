@@ -1,4 +1,5 @@
 """Тесты репозитория с временной БД."""
+
 from pathlib import Path
 
 import pytest
@@ -55,10 +56,15 @@ def test_add_session(repo):
 def test_update_session(repo):
     app_id = repo.add_watched_app(WatchedApp(process_name="test.exe"))
     sess_id = repo.add_session(Session(app_id=app_id, start_time="2026-01-01 00:00:00"))
-    repo.update_session(Session(
-        id=sess_id, end_time="2026-01-01 01:00:00",
-        duration_sec=3600, active_sec=1800, background_sec=1800,
-    ))
+    repo.update_session(
+        Session(
+            id=sess_id,
+            end_time="2026-01-01 01:00:00",
+            duration_sec=3600,
+            active_sec=1800,
+            background_sec=1800,
+        )
+    )
     rows = repo.db.execute("SELECT * FROM sessions WHERE id = ?", (sess_id,)).fetchall()
     assert len(rows) == 1
     assert rows[0]["duration_sec"] == 3600

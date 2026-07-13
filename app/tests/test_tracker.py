@@ -1,4 +1,5 @@
 """Тесты алгоритма трекинга."""
+
 import time
 from datetime import datetime
 from unittest.mock import MagicMock, patch
@@ -34,9 +35,11 @@ def tracker(mock_repo, mock_config):
 
 
 def test_tick_normal(tracker):
-    with patch("rlox_app_tracker.core.tracker.get_idle_seconds", return_value=5), \
-         patch("rlox_app_tracker.core.tracker.get_active_window_process", return_value=None), \
-         patch("rlox_app_tracker.core.tracker.get_running_process_names", return_value=set()):
+    with (
+        patch("rlox_app_tracker.core.tracker.get_idle_seconds", return_value=5),
+        patch("rlox_app_tracker.core.tracker.get_active_window_process", return_value=None),
+        patch("rlox_app_tracker.core.tracker.get_running_process_names", return_value=set()),
+    ):
         tracker._tick()
     assert tracker._tick_count == 1
 
@@ -92,6 +95,7 @@ def test_close_session_negative_protection(tracker):
 
 def test_day_boundary(tracker):
     from datetime import timedelta
+
     now = datetime.now()
     yesterday = now - timedelta(days=1)
     tracker._last_known_date = yesterday.date().isoformat()
@@ -120,9 +124,11 @@ def test_accumulator_handles_fractional(tracker):
     ctx.idle_now = 5
     ctx.window = {"title": "Test"}
     ctx.watched_ids = {1: WatchedApp(id=1, process_name="test.exe")}
-    with patch("rlox_app_tracker.core.tracker.get_idle_seconds", return_value=5), \
-         patch("rlox_app_tracker.core.tracker.get_active_window_process", return_value={"name": "test.exe", "title": "Test"}), \
-         patch("rlox_app_tracker.core.tracker.get_running_process_names", return_value={"test.exe"}):
+    with (
+        patch("rlox_app_tracker.core.tracker.get_idle_seconds", return_value=5),
+        patch("rlox_app_tracker.core.tracker.get_active_window_process", return_value={"name": "test.exe", "title": "Test"}),
+        patch("rlox_app_tracker.core.tracker.get_running_process_names", return_value={"test.exe"}),
+    ):
         pass
     tracker._update_sessions(ctx)
     assert state.active_sec >= 1
@@ -149,6 +155,7 @@ def test_empty_session_id_skipped(tracker):
 
 def test_periodic_flush(tracker):
     from datetime import timedelta
+
     start = datetime.now() - timedelta(hours=1)
     state = _SessionState(session_id=1, start_time=start, title="", active_sec=10, background_sec=5)
     tracker._sessions[1] = state
