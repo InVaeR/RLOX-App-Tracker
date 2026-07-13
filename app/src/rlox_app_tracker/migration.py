@@ -43,11 +43,27 @@ def _copy_db(old_path: Path) -> bool:
     try:
         shutil.copy2(str(old_path), str(backup_path))
         logger.info("Резервная копия старой БД: %s", backup_path)
+
+        db_dir = DB_PATH.parent
+        db_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy2(str(old_path), str(DB_PATH))
         for ext in ("-wal", "-shm"):
             src = old_path.with_name(old_path.name + ext)
             if src.exists():
-                shutil.copy2(str(src), str(DB_PATH.parent / (DB_PATH.name + ext)))
+                shutil.copy2(str(src), str(db_dir / (DB_PATH.name + ext)))
+
+        # Verify the copy — quick integrity check
+        try:
+            verify = sqlite3.connect(str(DB_PATH))
+            result = verify.execute("PRAGMA integrity_check").fetchone()
+            verify.close()
+            if result and result[0] == "ok":
+                logger.info("Целостность БД подтверждена")
+            else:
+                logger.warning("Проверка целостности: %s", result)
+        except Exception as e:
+            logger.warning("Проверка целостности не удалась (некритично): %s", e)
+
         logger.info("БД мигрирована: %s -> %s", old_path, DB_PATH)
         return True
     except OSError as e:

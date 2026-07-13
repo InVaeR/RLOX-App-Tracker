@@ -1,10 +1,13 @@
 import datetime
+import logging
 import sqlite3
 import threading
 from contextlib import contextmanager
 from pathlib import Path
 
 from rlox_app_tracker.paths import DB_PATH
+
+logger = logging.getLogger(__name__)
 
 
 def _adapt_datetime(dt: datetime.datetime) -> str:
@@ -40,6 +43,16 @@ class Database:
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.conn.execute("PRAGMA busy_timeout = 5000")
 
+    def _backup(self):
+        backup_path = self.db_path.with_suffix(".db.backup")
+        try:
+            conn = sqlite3.connect(str(backup_path))
+            self.conn.backup(conn)
+            conn.close()
+            logger.info("Резервная копия БД: %s", backup_path)
+        except Exception as e:
+            logger.warning("Не удалось создать резервную копию БД: %s", e)
+
     def _migrate(self):
         cur = self.conn.cursor()
         cur.execute("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER)")
@@ -47,10 +60,23 @@ class Database:
         current = row["version"] if row else 0
 
         migrations = [self._m001_initial, self._m002_active_bg, self._m003_indexes, self._m004_last_seen]
+        if current < len(migrations):
+            self._backup()
+
         for i, migration in enumerate(migrations, start=1):
-            if current < i:
+            if current >= i:
+                continue
+            try:
+                self.conn.execute("BEGIN")
                 migration(cur)
+                cur.execute("DELETE FROM schema_version")
+                cur.execute("INSERT INTO schema_version (version) VALUES (?)", (i,))
+                self.conn.commit()
                 current = i
+            except Exception:
+                self.conn.rollback()
+                logger.error("Миграция БД #%s не удалась", i)
+                raise
 
         cur.execute("DELETE FROM schema_version")
         cur.execute("INSERT INTO schema_version (version) VALUES (?)", (current,))
