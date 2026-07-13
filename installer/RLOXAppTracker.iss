@@ -4,8 +4,15 @@
 #define MyAppURL "https://github.com/InVaeR/RLOX-App-Tracker"
 #define MyAppExeName "RLOXAppTracker.exe"
 #define MyLauncherExeName "RLOXLauncher.exe"
-#define MyAppId "{B8A2C3D4-E5F6-7890-ABCD-EF1234567890}"
+#define MyAppId "{{B8A2C3D4-E5F6-7890-ABCD-EF1234567890}}"
 #define MyAutostartValue "RLOXAppTracker"
+
+#ifndef AppVersion
+  #define AppVersion "2.0.0-alpha.1"
+#endif
+#ifndef AppVersionNumeric
+  #define AppVersionNumeric "2.0.0.1"
+#endif
 
 [Setup]
 AppId={#MyAppId}
