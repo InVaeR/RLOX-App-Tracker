@@ -93,7 +93,7 @@ var
 begin
   Result := '';
   if not FileExists(FilePath) then Exit;
-  Content := LoadStringFromFile(FilePath);
+  LoadStringFromFile(FilePath, Content);
   QuotePos := Pos('"currentVersion"', Content);
   if QuotePos = 0 then Exit;
   QuotePos := Pos('"', Copy(Content, QuotePos + 16, 50));
