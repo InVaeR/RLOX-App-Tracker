@@ -160,7 +160,7 @@ begin
   Result := True;
   DataPath := ExpandConstant('{localappdata}') + '\RLOX App Tracker\data';
   ProductDataRoot := ExpandConstant('{localappdata}') + '\RLOX App Tracker';
-  InstallStatePath := ExpandConstant('{localappdata}\Programs\RLOX App Tracker\state\install.json');
+  InstallStatePath := ExpandConstant('{app}\state\install.json');
   OldDataFound := DirExists(DataPath);
   IsUpdate := CompareText(ExpandConstant('{param:UPDATE|0}'), '1') = 0;
 
@@ -185,7 +185,7 @@ var
   PreviousVersionJson: string;
   PendingVersionJson: string;
 begin
-  StateDir := ExpandConstant('{localappdata}\Programs\RLOX App Tracker\state');
+  StateDir := ExpandConstant('{app}\state');
   ForceDirectories(StateDir);
   StatePath := StateDir + '\install.json';
   TempPath := StatePath + '.tmp';

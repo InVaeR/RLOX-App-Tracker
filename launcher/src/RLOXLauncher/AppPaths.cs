@@ -15,7 +15,16 @@ internal static class AppPaths
     public static string AppConfigPath => Path.Combine(ConfigDir, "app.json");
     public static string LauncherLogPath => Path.Combine(LogsDir, "launcher.log");
 
-    public static string InstallDir => Path.Combine(LocalAppData, "Programs", ProductName);
+    public static string InstallDir
+    {
+        get
+        {
+            var exeDir = Path.GetDirectoryName(
+                System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName);
+            return exeDir ?? Path.Combine(LocalAppData, "Programs", ProductName);
+        }
+    }
+
     public static string StateDir => Path.Combine(InstallDir, "state");
     public static string VersionsDir => Path.Combine(InstallDir, "versions");
     public static string InstallJsonPath => Path.Combine(StateDir, "install.json");
