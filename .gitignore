@@ -31,6 +31,10 @@ Thumbs.db
 bin/
 obj/
 
+# Internal docs (not for repo)
+AUDIT.md
+repomix-output.md
+
 # App data (kept local)
 *.db
 *.db-wal
@@ -40,3 +44,6 @@ config.json
 # Installer output
 *.exe
 !app/assets/app.ico
+
+repomix-output.md
+AUDIT.md
