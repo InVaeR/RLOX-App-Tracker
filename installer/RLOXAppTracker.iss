@@ -87,13 +87,23 @@ var
 
 function ExtractVersionFromJson(const FilePath: string): string;
 var
+  Lines: TArrayOfString;
   Content: string;
+  i: Integer;
   QuotePos: Integer;
   EndQuotePos: Integer;
 begin
   Result := '';
   if not FileExists(FilePath) then Exit;
-  LoadStringFromFile(FilePath, Content);
+  Content := '';
+  if LoadStringsFromFile(FilePath, Lines) then
+  begin
+    for i := 0 to GetArrayLength(Lines) - 1 do
+    begin
+      if i > 0 then Content := Content + #13#10;
+      Content := Content + Lines[i];
+    end;
+  end;
   QuotePos := Pos('"currentVersion"', Content);
   if QuotePos = 0 then Exit;
   QuotePos := Pos('"', Copy(Content, QuotePos + 16, 50));
