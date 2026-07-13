@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import sys
+from pathlib import Path
 
 from PySide6.QtCore import QObject
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
@@ -12,7 +13,8 @@ from rlox_app_tracker.core.tracker import TrackerService
 from rlox_app_tracker.data.database import Database
 from rlox_app_tracker.data.repository import Repository
 from rlox_app_tracker.metadata import APP_EXE_NAME, PRODUCT_NAME, SINGLETON_KEY_APP
-from rlox_app_tracker.paths import STATE_DIR
+from rlox_app_tracker.migration import migrate, needs_migration
+from rlox_app_tracker.paths import DATA_DIR, STATE_DIR
 from rlox_app_tracker.services.config_manager import ConfigManager
 from rlox_app_tracker.ui.main_window import MainWindow
 from rlox_app_tracker.ui.style import APP_QSS
@@ -157,18 +159,27 @@ def main(argv=None):
         QMessageBox.critical(None, PRODUCT_NAME, "Не удалось запустить приложение: ошибка singleton-механизма.\n\nПопробуйте перезапустить приложение.")
         os._exit(1)
 
-    db = Database()
+    data_dir = Path(args.data_dir) if args.data_dir else DATA_DIR
+    data_dir.mkdir(parents=True, exist_ok=True)
+    db_path = data_dir / "tracker.db"
+
+    if needs_migration():
+        logger.info("Обнаружены данные RusLOXPy, запуск миграции...")
+        migrate()
+        logger.info("Миграция завершена")
+
+    db = Database(db_path=db_path)
     repo = Repository(db)
     config = ConfigManager()
 
     tracker = TrackerService(repo, config)
     window = MainWindow(repo, tracker, config)
 
-    si.on_shutdown(lambda: _shutdown(window, tracker, db, app))
+    si.on_shutdown(lambda: _shutdown(app))
     si.on_show(lambda: _show_window(window))
 
     def cleanup():
-        logger.info("Cleanup: останов трекера и БД")
+        logger.info("Shutdown: останов трекера и БД")
         try:
             tracker.stop()
         finally:
@@ -201,11 +212,7 @@ def _show_window(window: MainWindow):
     window.raise_()
 
 
-def _shutdown(window, tracker, db, app):
-    try:
-        tracker.stop()
-    finally:
-        db.close()
+def _shutdown(app):
     app.quit()
 
 

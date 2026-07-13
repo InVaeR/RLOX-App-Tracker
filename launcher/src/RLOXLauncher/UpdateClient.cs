@@ -1,10 +1,18 @@
+using System.Net;
+
 namespace RLOXLauncher;
 
 internal static class UpdateClient
 {
-    private static readonly HttpClient Client = new()
+    private const long MaxDownloadSize = 500_000_000; // 500 MB
+
+    private static readonly HttpClient Client = new(new HttpClientHandler
     {
-        Timeout = TimeSpan.FromSeconds(60),
+        MaxAutomaticRedirections = 5,
+        AllowAutoRedirect = true,
+    })
+    {
+        Timeout = TimeSpan.FromSeconds(120),
     };
 
     static UpdateClient()
@@ -14,6 +22,12 @@ internal static class UpdateClient
 
     public static async Task<UpdateManifest?> FetchManifestAsync(string url)
     {
+        if (!IsHttpsUrl(url))
+        {
+            Logger.Error($"Manifest URL is not HTTPS: {url}");
+            return null;
+        }
+
         try
         {
             var response = await Client.GetStringAsync(url);
@@ -28,6 +42,12 @@ internal static class UpdateClient
 
     public static async Task<string?> DownloadInstallerAsync(string url, string destDir, long expectedSize, string expectedSha256)
     {
+        if (!IsHttpsUrl(url))
+        {
+            Logger.Error($"Download URL is not HTTPS: {url}");
+            return null;
+        }
+
         Directory.CreateDirectory(destDir);
         var tmpPath = Path.Combine(destDir, "setup.exe.part");
         var finalPath = Path.Combine(destDir, "setup.exe");
@@ -39,18 +59,48 @@ internal static class UpdateClient
             using var response = await Client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
             response.EnsureSuccessStatusCode();
 
-            var totalBytes = response.Content.Headers.ContentLength ?? -1;
-            if (expectedSize > 0 && totalBytes > 0 && totalBytes != expectedSize)
+            var contentLength = response.Content.Headers.ContentLength ?? -1;
+
+            if (contentLength > MaxDownloadSize)
             {
-                Logger.Error($"Size mismatch: expected {expectedSize}, got {totalBytes}");
+                Logger.Error($"Content-Length {contentLength} exceeds maximum {MaxDownloadSize}");
+                return null;
+            }
+
+            if (expectedSize > 0 && contentLength > 0 && contentLength != expectedSize)
+            {
+                Logger.Error($"Size mismatch: expected {expectedSize}, got {contentLength}");
                 return null;
             }
 
             await using var stream = await response.Content.ReadAsStreamAsync();
             await using var fileStream = File.Create(tmpPath);
-            await stream.CopyToAsync(fileStream);
 
-            Logger.Info("Download complete, verifying SHA-256");
+            var buffer = new byte[81920];
+            long totalRead = 0;
+            int bytesRead;
+            while ((bytesRead = await stream.ReadAsync(buffer)) > 0)
+            {
+                if (totalRead + bytesRead > MaxDownloadSize)
+                {
+                    Logger.Error("Download exceeded maximum size");
+                    fileStream.Close();
+                    File.Delete(tmpPath);
+                    return null;
+                }
+
+                await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead));
+                totalRead += bytesRead;
+            }
+
+            if (expectedSize > 0 && totalRead != expectedSize)
+            {
+                Logger.Error($"Size mismatch after download: expected {expectedSize}, got {totalRead}");
+                File.Delete(tmpPath);
+                return null;
+            }
+
+            Logger.Info($"Downloaded {totalRead} bytes, verifying SHA-256");
 
             if (!HashVerifier.VerifySha256(tmpPath, expectedSha256))
             {
@@ -69,5 +119,11 @@ internal static class UpdateClient
             try { File.Delete(tmpPath); } catch { }
             return null;
         }
+    }
+
+    private static bool IsHttpsUrl(string url)
+    {
+        return Uri.TryCreate(url, UriKind.Absolute, out var uri)
+            && uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase);
     }
 }

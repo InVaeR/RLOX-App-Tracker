@@ -4,6 +4,7 @@ namespace RLOXLauncher;
 
 internal static class Logger
 {
+    private const long MaxLogSize = 2 * 1024 * 1024; // 2 MB
     private static string? _logPath;
     private static readonly object Lock = new();
 
@@ -34,6 +35,7 @@ internal static class Logger
             {
                 try
                 {
+                    RotateIfNeeded();
                     File.AppendAllText(_logPath, line + Environment.NewLine);
                 }
                 catch
@@ -42,5 +44,26 @@ internal static class Logger
                 }
             }
         }
+    }
+
+    private static void RotateIfNeeded()
+    {
+        if (_logPath == null || !File.Exists(_logPath)) return;
+        if (new FileInfo(_logPath).Length < MaxLogSize) return;
+
+        for (int i = 3; i >= 1; i--)
+        {
+            var oldPath = _logPath + "." + i;
+            var newPath = _logPath + "." + (i + 1);
+            if (File.Exists(oldPath))
+            {
+                if (i == 3)
+                    File.Delete(oldPath);
+                else
+                    File.Move(oldPath, newPath, overwrite: true);
+            }
+        }
+
+        File.Move(_logPath, _logPath + ".1", overwrite: true);
     }
 }

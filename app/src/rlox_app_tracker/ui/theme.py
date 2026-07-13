@@ -3,21 +3,21 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Palette:
-    bg = "#0f1117"
-    surface = "#171a21"
-    surface_hover = "#1e222b"
-    sidebar = "#13151c"
-    border = "#252a35"
-    text = "#e4e7ec"
-    text_muted = "#8b909a"
-    text_dim = "#5c616b"
-    accent = "#5b8def"
-    accent_hover = "#6f9bf2"
-    accent_soft = "#1d2740"
+    bg = "#244e3f"  # pine-teal
+    surface = "#315a4e"  # pine-teal-2
+    surface_hover = "#405e52"  # granite
+    sidebar = "#1a3a2f"  # darker pine-teal
+    border = "#4a6e5e"  # mid tone
+    text = "#cae6d8"  # honeydew
+    text_muted = "#a5c5b9"  # ash-grey
+    text_dim = "#8aad9e"  # darker ash-grey
+    accent = "#cae6d8"  # honeydew
+    accent_hover = "#daf0e2"  # lighter honeydew
+    accent_soft = "#2a5d4a"  # semi-transparent accent
     success = "#3ecf8e"
     warning = "#f5a623"
     danger = "#f0616d"
-    background_bar = "#3a4150"
+    background_bar = "#405e52"  # granite
 
 
 @dataclass(frozen=True)

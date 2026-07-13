@@ -6,6 +6,7 @@ import pytest
 from rlox_app_tracker.data.database import Database
 from rlox_app_tracker.data.models import Session, WatchedApp
 from rlox_app_tracker.data.repository import Repository
+from rlox_app_tracker.services.watchlist import WatchListManager
 
 
 @pytest.fixture
@@ -134,3 +135,24 @@ def test_is_watched(repo):
     repo.add_watched_app(WatchedApp(process_name="test.exe"))
     assert repo.is_watched("test.exe")
     assert not repo.is_watched("other.exe")
+
+
+def test_update_exe_path(repo):
+    app_id = repo.add_watched_app(WatchedApp(process_name="test.exe"))
+    repo.update_exe_path(app_id, "C:\\new\\path\\test.exe")
+    apps = repo.get_all_watched_apps()
+    assert apps[0].exe_path == "C:\\new\\path\\test.exe"
+
+
+def test_schema_version(db):
+    row = db.execute("SELECT version FROM schema_version").fetchone()
+    assert row is not None
+    assert row["version"] >= 4
+
+
+def test_watchlist_add_duplicate_returns_negative_one(repo):
+    mgr = WatchListManager(repo)
+    result1 = mgr.add_app("test.exe")
+    assert result1 >= 0
+    result2 = mgr.add_app("test.exe")
+    assert result2 == -1

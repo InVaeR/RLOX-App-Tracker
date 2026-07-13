@@ -214,6 +214,7 @@ class MainWindow(QMainWindow):
         self.tray_icon.setToolTip(PRODUCT_NAME)
         icon = self._load_icon()
         self.setWindowIcon(icon)
+        self.tray_icon.setIcon(icon)
         tray_menu = QMenu(self)
         show_action = QAction("Показать", self)
         show_action.triggered.connect(self.showNormal)

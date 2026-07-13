@@ -82,9 +82,12 @@ class TrackerService(QObject):
         self._timer.start(int(self._poll_interval * 1000))
 
     def stop(self):
+        if not self._running:
+            return
+        self._timer.stop()
         self._running = False
         self._close_all_sessions()
-        self._timer.stop()
+        self._last_tick_monotonic = None
 
     def pause(self):
         if self._paused:
@@ -196,6 +199,27 @@ class TrackerService(QObject):
             window=window,
         )
 
+    def _update_exe_paths(self, ctx: _TickContext):
+        for app in ctx.watched_apps:
+            if app.id is None or not app.process_name:
+                continue
+            if app.process_name in ctx.running_names:
+                try:
+                    import psutil
+
+                    for proc in psutil.process_iter(["name", "exe"]):
+                        try:
+                            if proc.info["name"] == app.process_name and proc.info["exe"]:
+                                new_exe = proc.info["exe"]
+                                if app.exe_path != new_exe:
+                                    app.exe_path = new_exe
+                                    self.repo.update_exe_path(app.id, new_exe)
+                                break
+                        except (psutil.NoSuchProcess, psutil.AccessDenied):
+                            continue
+                except Exception:
+                    pass
+
     def _update_sessions(self, ctx: _TickContext):
         for app in ctx.watched_apps:
             if app.id is None:
@@ -269,6 +293,7 @@ class TrackerService(QObject):
             self._close_all_sessions()
 
         ctx = self._collect_context(now, delta, slept)
+        self._update_exe_paths(ctx)
         self._update_sessions(ctx)
         self._cleanup_orphan_sessions(ctx)
         self._emit_live_info(ctx)

@@ -19,9 +19,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r app/requirements-dev.txt
       - name: Ruff check
-        run: ruff check app/src/
+        run: ruff check app/src/ app/tests/
       - name: Ruff format check
-        run: ruff format --check app/src/
+        run: ruff format --check app/src/ app/tests/
 
   test:
     runs-on: windows-latest
@@ -42,3 +42,5 @@ jobs:
         run: python -m pytest app/tests/ -v
       - name: Build launcher
         run: dotnet build launcher/src/RLOXLauncher/RLOXLauncher.csproj
+      - name: Build app (PyInstaller)
+        run: pyinstaller app/RLOXAppTracker.spec --noconfirm

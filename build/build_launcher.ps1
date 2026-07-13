@@ -13,7 +13,6 @@ Write-Host "=== Сборка RLOXLauncher (C#) ==="
 dotnet publish $Project `
     --configuration $Configuration `
     --runtime win-x64 `
-    --self-contained false `
     --output $OutDir `
     -p:PublishSingleFile=true `
     -p:IncludeNativeLibrariesForSelfExtract=true

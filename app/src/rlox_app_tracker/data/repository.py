@@ -116,6 +116,10 @@ class Repository:
         self.db.execute("UPDATE watched_apps SET display_name = ? WHERE id = ?", (name, app_id))
         self.db.commit()
 
+    def update_exe_path(self, app_id: int, exe_path: str):
+        self.db.execute("UPDATE watched_apps SET exe_path = ? WHERE id = ?", (exe_path, app_id))
+        self.db.commit()
+
     def clear_all_data(self):
         self.db.execute("DELETE FROM sessions")
         self.db.execute("DELETE FROM watched_apps")

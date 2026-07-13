@@ -35,6 +35,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r app/requirements-dev.txt
 
+      - name: Ruff checks
+        run: |
+          ruff check app/src/ app/tests/
+          ruff format --check app/src/ app/tests/
+
       - name: Run tests
         run: python -m pytest app/tests/ -v
 
@@ -44,7 +49,7 @@ jobs:
 
       - name: Smoke test
         run: |
-          if (-not (Test-Path "dist/app/versions/${{ steps.version.outputs.version }}/RLOXAppTracker.exe")) {
+          if (-not (Test-Path "dist/RLOXAppTracker/RLOXAppTracker.exe")) {
             Write-Error "EXE not found"
             exit 1
           }
@@ -59,7 +64,6 @@ jobs:
           dotnet publish launcher/src/RLOXLauncher/RLOXLauncher.csproj `
             --configuration Release `
             --runtime win-x64 `
-            --self-contained false `
             --output dist/launcher `
             -p:PublishSingleFile=true `
             -p:IncludeNativeLibrariesForSelfExtract=true
@@ -67,11 +71,11 @@ jobs:
       - name: Build installer
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          if (Test-Path $iscc) {
-            & $iscc "/DAppVersion=${{ steps.version.outputs.version }}" installer/RLOXAppTracker.iss
-          } else {
-            Write-Warning "Inno Setup not found, skipping installer build"
+          if (-not (Test-Path $iscc)) {
+            Write-Error "Inno Setup 6 not found — installer build required for release"
+            exit 1
           }
+          & $iscc "/DAppVersion=${{ steps.version.outputs.version }}" installer/RLOXAppTracker.iss
 
       - name: Generate SHA-256
         run: |

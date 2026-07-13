@@ -54,6 +54,14 @@ internal class LauncherConfig
         if (dir != null) Directory.CreateDirectory(dir);
         var tmp = path + ".tmp";
         File.WriteAllText(tmp, JsonSerializer.Serialize(this, JsonOpts));
-        File.Replace(tmp, path, null);
+        if (File.Exists(path))
+        {
+            var backup = path + ".bak";
+            File.Replace(tmp, path, backup);
+        }
+        else
+        {
+            File.Move(tmp, path);
+        }
     }
 }

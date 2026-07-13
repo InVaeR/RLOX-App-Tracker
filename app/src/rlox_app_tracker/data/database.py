@@ -28,6 +28,7 @@ class Database:
         self.db_path = db_path or DB_PATH
         self.lock = threading.Lock()
         self.conn: sqlite3.Connection = None
+        self._closed = False
         self._connect()
         self._migrate()
 
@@ -151,5 +152,10 @@ class Database:
                 raise
 
     def close(self):
+        if self._closed:
+            return
         with self.lock:
+            if self._closed:
+                return
+            self._closed = True
             self.conn.close()

@@ -66,8 +66,24 @@ internal class Program
         var installState = InstallState.Load(AppPaths.InstallJsonPath);
         Logger.Info($"Current version: {installState.CurrentVersion ?? "none"}");
 
+        // --repair: re-check startup marker, purge failed version
+        if (opts.Repair)
+        {
+            HandleRepair(installState);
+        }
+
+        // Check startup marker — if current version failed, roll back
+        if (!opts.UpdateOnly && installState.CurrentVersion != null)
+        {
+            var rolledBack = CheckStartupMarkerAndRollback(installState);
+            if (rolledBack) installState = InstallState.Load(AppPaths.InstallJsonPath);
+        }
+
+        // Clean up old versions (keep only current + previous)
+        CleanupOldVersions(installState);
+
         // --launch or default: if app already running, just activate it
-        if (!opts.CheckUpdates && !opts.UpdateOnly)
+        if (opts.Launch)
         {
             if (ProcessManager.IsAppRunning())
             {
@@ -80,16 +96,24 @@ internal class Program
         // Read launcher config
         var config = LauncherConfig.Load(AppPaths.LauncherConfigPath);
 
-        // --check-updates or automatic check
-        var shouldCheck = opts.CheckUpdates || (opts.AutoCheck && config.CheckOnLaunch && ShouldCheck(config));
+        // Determine whether to check for updates
+        var shouldCheck = opts.CheckUpdates
+                       || (opts.Launch && config.CheckOnLaunch && ShouldCheck(config))
+                       || opts.UpdateOnly;
 
-        if (shouldCheck || opts.CheckUpdates || opts.UpdateOnly)
+        if (shouldCheck)
         {
             Logger.Info("Checking for updates...");
             var manifest = await UpdateClient.FetchManifestAsync(ManifestUrl);
 
             if (manifest != null)
             {
+                if (!manifest.IsValid(config.Channel))
+                {
+                    Logger.Warn("Manifest validation failed — ignoring");
+                }
+                else
+                {
                 Logger.Info($"Manifest version: {manifest.Version}, current: {installState.CurrentVersion}");
 
                 var hasUpdate = UpdateManifest.IsNewerVersion(installState.CurrentVersion, manifest.Version);
@@ -98,58 +122,175 @@ internal class Program
                 {
                     Logger.Info($"Update available: {manifest.Version}");
 
-                    // Update config lastCheckAt
                     config.LastCheckAt = DateTime.Now.ToString("o");
                     config.Save(AppPaths.LauncherConfigPath);
 
-                    if (opts.UpdateOnly)
+                    var shouldInstall = opts.UpdateOnly; // --update-only always installs
+
+                    if (!shouldInstall && opts.Interactive)
                     {
-                        // Just install update and exit
-                        await PerformUpdate(manifest, installState, config, opts);
-                        return;
+                        shouldInstall = ShowUpdateDialog(installState.CurrentVersion ?? "unknown", manifest);
                     }
 
-                    if (opts.Interactive)
+                    if (!shouldInstall && !opts.Interactive && !opts.CheckUpdates)
                     {
-                        var proceed = ShowUpdateDialog(installState.CurrentVersion ?? "unknown", manifest);
-                        if (!proceed) return;
+                        // --launch with auto-check: respect AutoInstall
+                        shouldInstall = config.AutoInstall || manifest.Mandatory;
                     }
 
-                    await PerformUpdate(manifest, installState, config, opts);
-                    return; // setup will restart launcher
+                    if (shouldInstall)
+                    {
+                        var success = await PerformUpdate(manifest, installState, config, opts);
+                        if (!success)
+                        {
+                            Logger.Warn("Update failed — will launch current version if applicable");
+                        }
+                        else
+                        {
+                            return; // setup will restart launcher
+                        }
+                    }
                 }
-                else
+                    else
+                    {
+                        Logger.Info("No update available");
+                        config.LastCheckAt = DateTime.Now.ToString("o");
+                        config.Save(AppPaths.LauncherConfigPath);
+                    }
+                }
+            }
+        }
+        else
+        {
+            Logger.Warn("Failed to fetch manifest — will launch current version");
+        }
+
+        // If --check-updates was used without --launch, don't launch app
+        if (opts.CheckUpdates && !opts.Launch)
+        {
+            Logger.Info("Check complete, not launching (--check-updates without --launch)");
+            return;
+        }
+
+        // --update-only: don't launch app after update attempt
+        if (opts.UpdateOnly)
+        {
+            return;
+        }
+
+        // Launch app (either normal --launch, or fallback after failed update)
+        var exePath = installState.GetAppExePath();
+        if (exePath == null)
+        {
+            Logger.Error("No app version found to launch");
+            Console.Error.WriteLine("Error: RLOX App Tracker is not installed correctly.");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        Logger.Info($"Launching app: {exePath}");
+        AppLauncher.Launch(exePath, opts.Background, opts.AfterUpdate);
+    }
+
+    private static void HandleRepair(InstallState installState)
+    {
+        var current = installState.CurrentVersion;
+        if (current != null)
+        {
+            var marker = Path.Combine(AppPaths.StateDir, $"startup-ok-{current}");
+            if (!File.Exists(marker))
+            {
+                Logger.Warn($"Repair: startup marker missing for version {current}");
+                var prev = installState.PreviousVersion;
+                if (prev != null)
                 {
-                    Logger.Info("No update available");
-                    // Update lastCheckAt even if no update
-                    config.LastCheckAt = DateTime.Now.ToString("o");
-                    config.Save(AppPaths.LauncherConfigPath);
+                    Logger.Info($"Repair: rolling back to {prev}");
+                    installState.CurrentVersion = prev;
+                    installState.PreviousVersion = null;
+                    installState.AppExecutable = $"versions\\{installState.CurrentVersion}\\RLOXAppTracker.exe";
+                    installState.Save(AppPaths.InstallJsonPath);
                 }
             }
             else
             {
-                Logger.Warn("Failed to fetch manifest — will launch current version");
+                Logger.Info("Repair: startup marker OK");
             }
-        }
-
-        // --launch app
-        if (!opts.UpdateOnly)
-        {
-            var exePath = installState.GetAppExePath();
-            if (exePath == null)
-            {
-                Logger.Error("No app version found to launch");
-                Console.Error.WriteLine("Error: RLOX App Tracker is not installed correctly.");
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            Logger.Info($"Launching app: {exePath}");
-            AppLauncher.Launch(exePath, opts.Background, opts.AfterUpdate);
         }
     }
 
-    private static async Task PerformUpdate(UpdateManifest manifest, InstallState installState, LauncherConfig config, Options opts)
+    /// <summary>
+    /// Checks startup-ok marker for the current version.
+    /// If missing, the previous launch failed — roll back to previous version.
+    /// </summary>
+    private static bool CheckStartupMarkerAndRollback(InstallState installState)
+    {
+        var current = installState.CurrentVersion;
+        if (current == null) return false;
+
+        var marker = Path.Combine(AppPaths.StateDir, $"startup-ok-{current}");
+        if (!File.Exists(marker))
+        {
+            Logger.Warn($"Startup marker not found for version {current} — possible crash");
+
+            var prev = installState.PreviousVersion;
+            if (prev != null)
+            {
+                Logger.Info($"Rolling back to version {prev}");
+
+                var prevExe = Path.Combine(AppPaths.VersionsDir, prev, "RLOXAppTracker.exe");
+                if (File.Exists(prevExe))
+                {
+                    installState.CurrentVersion = prev;
+                    installState.PreviousVersion = null;
+                    installState.AppExecutable = $"versions\\{installState.CurrentVersion}\\RLOXAppTracker.exe";
+                    installState.Save(AppPaths.InstallJsonPath);
+                    Logger.Info($"Rolled back to version {installState.CurrentVersion}");
+                    return true;
+                }
+
+                Logger.Warn("Previous version files not found, cannot roll back");
+            }
+            else
+            {
+                Logger.Warn("No previous version to roll back to");
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Removes version directories older than the current and previous versions.
+    /// </summary>
+    private static void CleanupOldVersions(InstallState installState)
+    {
+        var versionsDir = AppPaths.VersionsDir;
+        if (!Directory.Exists(versionsDir)) return;
+
+        var keep = new HashSet<string>();
+        if (installState.CurrentVersion != null)
+            keep.Add(installState.CurrentVersion);
+        if (installState.PreviousVersion != null)
+            keep.Add(installState.PreviousVersion);
+
+        foreach (var dir in Directory.GetDirectories(versionsDir))
+        {
+            var versionName = Path.GetFileName(dir);
+            if (!keep.Contains(versionName))
+            {
+                try
+                {
+                    Directory.Delete(dir, true);
+                    Logger.Info($"Removed old version: {versionName}");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn($"Failed to remove old version {versionName}: {ex.Message}");
+                }
+            }
+        }
+    }
+
+    private static async Task<bool> PerformUpdate(UpdateManifest manifest, InstallState installState, LauncherConfig config, Options opts)
     {
         // Download installer
         Logger.Info("Downloading installer...");
@@ -164,7 +305,7 @@ internal class Program
             Logger.Error("Download failed — aborting update");
             if (opts.Interactive)
                 Console.Error.WriteLine("Download failed. Check logs for details.");
-            return;
+            return false;
         }
 
         // Send IPC shutdown to app
@@ -186,10 +327,16 @@ internal class Program
 
         // Run installer
         Logger.Info("Running installer...");
-        UpdateInstaller.RunInstaller(setupPath);
+        var started = UpdateInstaller.RunInstaller(setupPath);
+        if (!started)
+        {
+            Logger.Error("Failed to start installer");
+            return false;
+        }
 
         // Launcher will exit — the installer will launch the new launcher
         Logger.Info("Setup started, exiting launcher");
+        return true;
     }
 
     private static bool ShouldCheck(LauncherConfig config)
@@ -239,7 +386,7 @@ internal class Program
             switch (args[i].ToLowerInvariant())
             {
                 case "--launch":
-                    opts.AutoCheck = true;
+                    opts.Launch = true;
                     break;
                 case "--background":
                     opts.Background = true;
@@ -334,6 +481,20 @@ internal class InstallState
             }
         }
         return new InstallState();
+    }
+
+    private static readonly JsonSerializerOptions JsonWriteOpts = new()
+    {
+        WriteIndented = true,
+    };
+
+    public void Save(string path)
+    {
+        var dir = Path.GetDirectoryName(path);
+        if (dir != null) Directory.CreateDirectory(dir);
+        var tmp = path + ".tmp";
+        File.WriteAllText(tmp, JsonSerializer.Serialize(this, JsonWriteOpts));
+        File.Replace(tmp, path, null);
     }
 
     public string? GetAppExePath()

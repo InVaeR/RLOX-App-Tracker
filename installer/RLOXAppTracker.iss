@@ -5,6 +5,7 @@
 #define MyAppExeName "RLOXAppTracker.exe"
 #define MyLauncherExeName "RLOXLauncher.exe"
 #define MyAppId "{B8A2C3D4-E5F6-7890-ABCD-EF1234567890}"
+#define MyAutostartValue "RLOXAppTracker"
 
 [Setup]
 AppId={#MyAppId}
@@ -24,6 +25,7 @@ SolidCompression=yes
 UninstallDisplayIcon={app}\{#MyLauncherExeName}
 DisableWelcomePage=no
 DisableReadyPage=no
+CloseApplications=no
 
 [Languages]
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
@@ -35,9 +37,6 @@ Source: "..\dist\launcher\{#MyLauncherExeName}"; DestDir: "{app}"; Flags: ignore
 ; Версия приложения
 Source: "..\dist\app\versions\{#AppVersion}\*"; DestDir: "{app}\versions\{#AppVersion}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-; Update manifest
-Source: "..\release\install.json"; DestDir: "{app}\state"; Flags: ignoreversion
-
 [Dirs]
 Name: "{app}\versions"
 Name: "{app}\state"
@@ -46,17 +45,17 @@ Name: "{app}\state"
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyLauncherExeName}"; Parameters: "--launch"
 Name: "{group}\Проверить обновления"; Filename: "{app}\{#MyLauncherExeName}"; Parameters: "--check-updates --interactive"
 Name: "{group}\Удалить {#MyAppName}"; Filename: "{uninstallexe}"
-Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyLauncherExeName}"; Parameters: "--launch"; Tasks: desktopicon
+Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\{#MyLauncherExeName}"; Parameters: "--launch"; Tasks: desktopicon
 
 [Tasks]
 Name: "desktopicon"; Description: "Создать ярлык на рабочем столе"; GroupDescription: "Ярлыки:"
 Name: "autostart"; Description: "Запускать вместе с Windows"; GroupDescription: "Автозапуск:"
 
 [Run]
-Filename: "{app}\{#MyLauncherExeName}"; Parameters: "--launch"; Description: "Запустить {#MyAppName}"; Flags: postinstall nowait skipifsilent
+Filename: "{app}\{#MyLauncherExeName}"; Parameters: "--launch"; Description: "Запустить {#MyAppName}"; Flags: postinstall nowait
 
 [Registry]
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#MyAppName}"; ValueData: """{app}\{#MyLauncherExeName}"" --launch --background"; Tasks: autostart; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#MyAutostartValue}"; ValueData: """{app}\{#MyLauncherExeName}"" --launch --background"; Tasks: autostart; Flags: uninsdeletevalue
 
 [UninstallRun]
 Filename: "{app}\{#MyLauncherExeName}"; Parameters: "--shutdown"; Flags: runhidden waituntilterminated
@@ -65,25 +64,73 @@ Filename: "{app}\{#MyLauncherExeName}"; Parameters: "--shutdown"; Flags: runhidd
 Type: filesifnotempty; Name: "{app}\state\install.json"
 Type: dirifempty; Name: "{app}\state"
 Type: dirifempty; Name: "{app}\versions"
+Type: filesifnotempty; Name: "{app}\launcher.version"
 Type: dirifempty; Name: "{app}"
 
 [Code]
 var
   DataPage: TInputOptionWizardPage;
   DataPath: string;
+  InstallStatePath: string;
   OldDataFound: Boolean;
+  IsUpdate: Boolean;
+  PrevVersion: string;
+
+function ExtractVersionFromJson(const FilePath: string): string;
+var
+  Content: string;
+  QuotePos: Integer;
+  EndQuotePos: Integer;
+begin
+  Result := '';
+  if not FileExists(FilePath) then Exit;
+  Content := LoadStringFromFile(FilePath);
+  QuotePos := Pos('"currentVersion"', Content);
+  if QuotePos = 0 then Exit;
+  QuotePos := Pos('"', Copy(Content, QuotePos + 16, 50));
+  if QuotePos = 0 then Exit;
+  EndQuotePos := Pos('"', Copy(Content, QuotePos + 1, 30));
+  if EndQuotePos = 0 then Exit;
+  Result := Copy(Content, QuotePos + 1, EndQuotePos - 1);
+end;
 
 function InitializeSetup: Boolean;
 begin
   Result := True;
   DataPath := ExpandConstant('{localappdata}') + '\RLOX App Tracker\data';
+  InstallStatePath := ExpandConstant('{localappdata}\Programs\RLOX App Tracker\state\install.json');
   OldDataFound := DirExists(DataPath);
+  IsUpdate := CmdLineParamExists('/UPDATE');
+
+  if IsUpdate then
+    PrevVersion := ExtractVersionFromJson(InstallStatePath);
+end;
+
+procedure WriteInstallJson;
+var
+  Json: string;
+  StateDir: string;
+begin
+  StateDir := ExpandConstant('{localappdata}\Programs\RLOX App Tracker\state');
+  ForceDirectories(StateDir);
+
+  Json := '{' + #13#10 +
+          '  "schemaVersion": 1,' + #13#10 +
+          '  "currentVersion": "{#AppVersion}",' + #13#10 +
+          '  "previousVersion": "' + PrevVersion + '",' + #13#10 +
+          '  "channel": "stable",' + #13#10 +
+          '  "installedAt": "' + GetDateTimeString('yyyy-mm-dd", "hh:nn:ss', '-', ':') + '",' + #13#10 +
+          '  "appExecutable": "versions\{#AppVersion}\{#MyAppExeName}"' + #13#10 +
+          '}';
+
+  SaveStringToFile(StateDir + '\install.json', Json, False);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
   begin
+    WriteInstallJson;
     if OldDataFound then
       Log('Пользовательские данные сохранены: ' + DataPath);
   end;
@@ -102,5 +149,18 @@ begin
       if Answer = IDYES then
         DelTree(DataPath, True, True, True);
     end;
+  end;
+end;
+
+function InitializeUninstall: Boolean;
+var
+  ResultCode: Integer;
+  LauncherExe: string;
+begin
+  Result := True;
+  LauncherExe := ExpandConstant('{app}\{#MyLauncherExeName}');
+  if FileExists(LauncherExe) then
+  begin
+    Exec(LauncherExe, '--shutdown', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
 end;

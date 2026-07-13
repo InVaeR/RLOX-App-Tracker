@@ -67,11 +67,35 @@ internal class UpdateManifest
     {
         if (string.IsNullOrEmpty(current)) return !string.IsNullOrEmpty(candidate);
         if (string.IsNullOrEmpty(candidate)) return false;
-        if (System.Version.TryParse(current.TrimStart('v'), out var cur) &&
-            System.Version.TryParse(candidate.TrimStart('v'), out var can))
+        if (SemVersion.TryParse(current, out var cur) &&
+            SemVersion.TryParse(candidate, out var can))
         {
             return can > cur;
         }
         return string.Compare(candidate, current, StringComparison.OrdinalIgnoreCase) > 0;
+    }
+
+    public bool IsValid(string configChannel)
+    {
+        if (SchemaVersion != 1) return false;
+        if (Product != "rlox-app-tracker") return false;
+        if (string.IsNullOrEmpty(Version)) return false;
+        if (!SemVersion.TryParse(Version, out _)) return false;
+        if (Installer == null) return false;
+        if (string.IsNullOrEmpty(Installer.Url)) return false;
+        if (!Installer.Url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return false;
+        if (Installer.Size <= 0) return false;
+        if (Installer.Size > 500_000_000) return false; // 500 MB max
+        if (string.IsNullOrEmpty(Installer.Sha256)) return false;
+        if (Installer.Sha256.Length != 64) return false;
+        if (!string.IsNullOrEmpty(MinimumLauncherVersion))
+        {
+            if (!SemVersion.TryParse(MinimumLauncherVersion, out var minLauncher)) return false;
+            if (!SemVersion.TryParse(typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0", out var launcherVer)) return false;
+            if (launcherVer < minLauncher) return false;
+        }
+        if (!string.IsNullOrEmpty(Channel) && !string.Equals(Channel, configChannel, StringComparison.OrdinalIgnoreCase))
+            return false;
+        return true;
     }
 }
