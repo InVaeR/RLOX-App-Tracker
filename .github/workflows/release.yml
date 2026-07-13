@@ -49,9 +49,20 @@ jobs:
             exit 1
           }
 
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
       - name: Build launcher
         run: |
-          pyinstaller --noconfirm --onedir --name RLOXLauncher --distpath dist/launcher --workpath build/pyinstaller_launcher --windowed launcher/src/launcher.py
+          dotnet publish launcher/src/RLOXLauncher/RLOXLauncher.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained false `
+            --output dist/launcher `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true
 
       - name: Build installer
         run: |

@@ -77,8 +77,9 @@ RLOX-App-Tracker/
 │   │   └── rlox_app_tracker/  # Пакет приложения
 │   ├── tests/              # Тесты (pytest)
 │   └── requirements*.txt
-├── launcher/               # Лаунчер на Python
-│   └── src/launcher.py
+├── launcher/               # Лаунчер на C# (.NET)
+│   ├── src/RLOXLauncher/
+│   └── tests/
 ├── installer/              # Inno Setup скрипты
 ├── build/                  # Скрипты сборки
 ├── docs/                   # Документация

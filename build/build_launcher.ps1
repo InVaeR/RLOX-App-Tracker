@@ -1,25 +1,23 @@
-# Сборка лаунчера
+# Сборка C# лаунчера
 param(
-    [string]$OutDir = "$PSScriptRoot\..\dist\launcher"
+    [string]$Configuration = "Release"
 )
 
 $ErrorActionPreference = "Stop"
 $Root = Resolve-Path "$PSScriptRoot\.."
-
-Write-Host "=== Сборка RLOXLauncher ==="
-
+$Project = Join-Path $Root "launcher\src\RLOXLauncher\RLOXLauncher.csproj"
 $OutDir = Join-Path $Root "dist\launcher"
-New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
 
-& pyinstaller --noconfirm `
-    --onedir `
-    --name RLOXLauncher `
-    --distpath $OutDir `
-    --workpath build\pyinstaller_launcher `
-    --windowed `
-    --collect-data=psutil `
-    launcher\src\launcher.py
+Write-Host "=== Сборка RLOXLauncher (C#) ==="
+
+dotnet publish $Project `
+    --configuration $Configuration `
+    --runtime win-x64 `
+    --self-contained false `
+    --output $OutDir `
+    -p:PublishSingleFile=true `
+    -p:IncludeNativeLibrariesForSelfExtract=true
 
 if (-not $?) { throw "Launcher build failed" }
 
-Write-Host "Лаунчер собран: $OutDir"
+Write-Host "Лаунчер собран: $OutDir\RLOXLauncher.exe"
