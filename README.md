@@ -25,28 +25,56 @@
 ### Требования
 
 - Python 3.11+
+- .NET 10 SDK (для сборки лаунчера)
 - Windows 10/11 x64
 
-### Установка
+### Установка зависимостей
 
-```bash
+```powershell
 cd app
 pip install -r requirements.txt
 ```
 
-### Запуск
+### Запуск Python-приложения
 
-```bash
-cd app/src
+```powershell
+$env:PYTHONPATH = "app\src"
 python -m rlox_app_tracker
+```
+
+или:
+
+```powershell
+cd app\src
+python -m rlox_app_tracker
+```
+
+### Запуск C# лаунчера
+
+```powershell
+dotnet run --project launcher\src\RLOXLauncher -- --launch
+```
+
+или собрать отдельно:
+
+```powershell
+dotnet publish launcher\src\RLOXLauncher\RLOXLauncher.csproj -c Release -r win-x64 -o dist\launcher -p:PublishSingleFile=true
+.\dist\launcher\RLOXLauncher.exe --launch
 ```
 
 ### Разработка
 
-```bash
+```powershell
 cd app
 pip install -r requirements-dev.txt
+$env:PYTHONPATH = "app\src"
 python -m pytest tests/ -v
+```
+
+C# тесты:
+
+```powershell
+dotnet test launcher\tests\RLOXLauncher.Tests.csproj
 ```
 
 ## Установка (для пользователей)

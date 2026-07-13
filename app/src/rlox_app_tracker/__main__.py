@@ -152,7 +152,7 @@ def main(argv=None):
     result = si.try_acquire()
 
     if result == "already_running":
-        logger.warning("Приложение уже запущено — активируем окно")
+        logger.info("Приложение уже запущено — активируем существующее окно")
         sys.exit(0)
 
     if result == "error":
