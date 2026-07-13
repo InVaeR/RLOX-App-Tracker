@@ -8,7 +8,7 @@ _local_app_data = Path(os.getenv("LOCALAPPDATA", Path.home() / "AppData" / "Loca
 _data_root = _local_app_data / PRODUCT_NAME
 
 if getattr(sys, "frozen", False):
-    APP_DIR = Path(sys.executable).parent
+    APP_DIR = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
 else:
     APP_DIR = Path(__file__).resolve().parent.parent.parent.parent
 

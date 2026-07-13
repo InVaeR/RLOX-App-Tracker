@@ -126,7 +126,7 @@ jobs:
             throw "Application EXE not found: $appExe"
           }
 
-          $assets = "dist/RLOXAppTracker/assets"
+          $assets = "dist/RLOXAppTracker/_internal/assets"
           if (-not (Test-Path $assets)) {
             throw "Application assets not found: $assets"
           }
