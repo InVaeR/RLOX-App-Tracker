@@ -1,5 +1,7 @@
-from PySide6.QtWidgets import QFrame, QVBoxLayout, QLabel
-from rlox_app_tracker.ui.theme import PALETTE as C, SPACING as S
+from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
+
+from rlox_app_tracker.ui.theme import PALETTE as C
+from rlox_app_tracker.ui.theme import SPACING as S
 
 
 class StatCard(QFrame):

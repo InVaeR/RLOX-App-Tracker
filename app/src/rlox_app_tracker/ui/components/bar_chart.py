@@ -1,6 +1,7 @@
-from PySide6.QtWidgets import QWidget, QScrollArea
-from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QPainter, QColor
+from PySide6.QtCore import QSize, Qt
+from PySide6.QtGui import QColor, QPainter
+from PySide6.QtWidgets import QScrollArea, QWidget
+
 from rlox_app_tracker.ui.theme import PALETTE as C
 from rlox_app_tracker.utils.format import fmt_duration
 

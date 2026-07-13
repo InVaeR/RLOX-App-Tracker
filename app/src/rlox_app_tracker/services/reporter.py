@@ -1,8 +1,8 @@
 import csv
 from typing import List
 
-from rlox_app_tracker.data.repository import Repository
 from rlox_app_tracker.data.models import AppStats
+from rlox_app_tracker.data.repository import Repository
 
 
 class Reporter:

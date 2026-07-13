@@ -1,22 +1,23 @@
-import sys
 import logging
+import sys
 import winreg
 
-from rlox_app_tracker.metadata import AUTOSTART_VALUE as __app_name__
+from rlox_app_tracker.metadata import AUTOSTART_VALUE
+from rlox_app_tracker.paths import LAUNCHER_PATH
 
 logger = logging.getLogger(__name__)
 
 REG_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 
 
-def enable_autostart(app_name: str = __app_name__):
-    path = sys.executable
-    script = ""
+def _autostart_cmd() -> str:
     if getattr(sys, "frozen", False):
-        cmd = f'"{path}"'
-    else:
-        script = __import__("__main__").__file__
-        cmd = f'"{path}" "{script}"'
+        return f'"{LAUNCHER_PATH}" --launch --background'
+    return f'"{sys.executable}" -m rlox_app_tracker --background'
+
+
+def enable_autostart(app_name: str = AUTOSTART_VALUE):
+    cmd = _autostart_cmd()
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_KEY, 0, winreg.KEY_SET_VALUE) as k:
             winreg.SetValueEx(k, app_name, 0, winreg.REG_SZ, cmd)
@@ -25,7 +26,7 @@ def enable_autostart(app_name: str = __app_name__):
         raise
 
 
-def disable_autostart(app_name: str = __app_name__):
+def disable_autostart(app_name: str = AUTOSTART_VALUE):
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_KEY, 0, winreg.KEY_SET_VALUE) as k:
             try:
@@ -37,17 +38,11 @@ def disable_autostart(app_name: str = __app_name__):
         raise
 
 
-def is_autostart_enabled(app_name: str = __app_name__) -> bool:
+def is_autostart_enabled(app_name: str = AUTOSTART_VALUE) -> bool:
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_KEY, 0, winreg.KEY_READ) as k:
             value, _ = winreg.QueryValueEx(k, app_name)
-            path = sys.executable
-            if getattr(sys, "frozen", False):
-                expected = f'"{path}"'
-            else:
-                script = __import__("__main__").__file__
-                expected = f'"{path}" "{script}"'
-            return value == expected
+            return value == _autostart_cmd()
     except FileNotFoundError:
         return False
     except OSError:

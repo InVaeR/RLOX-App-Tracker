@@ -1,21 +1,35 @@
+from pathlib import Path
 from typing import Dict
 
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
-    QTableWidgetItem, QHeaderView, QMessageBox, QDialog, QListWidget,
-    QListWidgetItem, QDialogButtonBox, QFileDialog, QLabel, QLineEdit,
-    QStackedWidget, QMenu, QInputDialog,
-)
-from pathlib import Path
-
-from PySide6.QtGui import QShortcut, QKeySequence
 from PySide6.QtCore import Qt
-from rlox_app_tracker.services.watchlist import WatchListManager
-from rlox_app_tracker.data.repository import Repository
+from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMenu,
+    QMessageBox,
+    QPushButton,
+    QStackedWidget,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+
 from rlox_app_tracker.core.process_scanner import list_running_apps
-from rlox_app_tracker.ui.components.empty_state import EmptyState
-from rlox_app_tracker.ui.components.app_icons import get_app_icon, asset_pixmap
+from rlox_app_tracker.data.repository import Repository
+from rlox_app_tracker.services.watchlist import WatchListManager
+from rlox_app_tracker.ui.components.app_icons import asset_pixmap, get_app_icon
 from rlox_app_tracker.ui.components.app_item_delegate import AppItemDelegate
+from rlox_app_tracker.ui.components.empty_state import EmptyState
 from rlox_app_tracker.ui.theme import PALETTE as C
 from rlox_app_tracker.utils.format import fmt_duration
 

@@ -1,10 +1,11 @@
-# RusLOXPy
+# RLOX App Tracker
 
-[![Release](https://img.shields.io/github/v/release/InVaeR/RusLOXPy)](https://github.com/InVaeR/RusLOXPy/releases/latest)
-
-> Скачать готовый `.exe`: [Releases](https://github.com/InVaeR/RusLOXPy/releases/latest)
+[![CI](https://github.com/InVaeR/RLOX-App-Tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/InVaeR/RLOX-App-Tracker/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/InVaeR/RLOX-App-Tracker)](https://github.com/InVaeR/RLOX-App-Tracker/releases/latest)
 
 Отслеживание времени использования выбранных пользователем приложений на **Windows** (только x64).
+
+Основано на **RusLOXPy** v1.1.1 ([legacy](https://github.com/InVaeR/RusLOXPy)).
 
 ## Возможности
 
@@ -15,10 +16,74 @@
 - Статистика за день / неделю / месяц / всё время
 - Экспорт статистики в CSV
 - Работа в фоне (сворачивание в трей)
-- Автозапуск через реестр
-- Настраиваемые: порог простоя, интервал опроса, автостарт
-- Единый экземпляр приложения (защита от дублирования)
+- Автозапуск через лаунчер
+- Настраиваемые: порог простоя, интервал опроса
+- Единый экземпляр приложения (IPC)
 - Горячие клавиши: Ctrl+1/2/3 — навигация, Delete — удаление из списка
+- Автоматические обновления через лаунчер
+
+## Быстрый старт (из исходников)
+
+### Требования
+
+- Python 3.11+
+- Windows 10/11 x64
+
+### Установка
+
+```bash
+cd app
+pip install -r requirements.txt
+```
+
+### Запуск
+
+```bash
+cd app/src
+python -m rlox_app_tracker
+```
+
+### Разработка
+
+```bash
+cd app
+pip install -r requirements-dev.txt
+python -m pytest tests/ -v
+```
+
+## Установка (для пользователей)
+
+Скачайте установщик со [страницы релизов](https://github.com/InVaeR/RLOX-App-Tracker/releases/latest):
+
+```
+RLOX-App-Tracker-Setup-x64.exe
+```
+
+Установщик:
+
+- устанавливает лаунчер и приложение;
+- создаёт ярлыки в меню «Пуск» (и опционально на рабочем столе);
+- регистрирует программу в списке установленных приложений Windows;
+- поддерживает автозапуск;
+- импортирует данные из RusLOXPy (если найдены);
+- не требует прав администратора.
+
+## Структура проекта
+
+```
+RLOX-App-Tracker/
+├── app/                    # Основное Python/PySide6-приложение
+│   ├── src/
+│   │   └── rlox_app_tracker/  # Пакет приложения
+│   ├── tests/              # Тесты (pytest)
+│   └── requirements*.txt
+├── launcher/               # Лаунчер на Python
+│   └── src/launcher.py
+├── installer/              # Inno Setup скрипты
+├── build/                  # Скрипты сборки
+├── docs/                   # Документация
+└── release/                # Манифесты обновлений
+```
 
 ## Технологии
 
@@ -27,52 +92,25 @@
 | GUI        | PySide6 (Qt)                     |
 | Процессы   | psutil                           |
 | WinAPI     | pywin32 (win32gui, win32process) |
-| БД         | sqlite3 (встроенная)             |
-| Автозапуск | winreg                           |
-
-## Установка
-
-```bash
-pip install -r requirements.txt
-```
-
-## Запуск
-
-```bash
-python main.py
-```
+| БД         | SQLite3 (встроенная)             |
+| Сборка     | PyInstaller (onedir)             |
+| Установка  | Inno Setup 6                     |
 
 ## Версия
 
-Версия формируется автоматически при запуске: `{major}.{minor}.{patch}-{YYYYMMDD}` (дата сборки).  
-Хранится в `version.py`.  
-Проверка обновлений: Настройки → О программе → «Проверить обновления».
+Используется SemVer: `2.0.0-dev`, `2.0.0`, `2.0.1`, `2.1.0` и т.д.
 
-## Сборка в .exe
+Версия задаётся в `app/src/rlox_app_tracker/version.py` и соответствует Git-тегу.
 
-### Требования
+## Документация
 
-```bash
-pip install -r requirements-dev.txt   # pyinstaller, pillow
-```
+- [Архитектура](docs/ARCHITECTURE.md)
+- [Протокол обновления](docs/UPDATE_PROTOCOL.md)
+- [Релизный процесс](docs/RELEASE.md)
+- [Миграция](docs/MIGRATION.md)
+- [Безопасность](docs/SECURITY.md)
+- [Тестирование](docs/TESTING.md)
 
-### Быстрая сборка
+## Лицензия
 
-```bat
-.\build.bat
-```
-
-### Ручная сборка
-
-```bash
-# 1. Сгенерировать иконку
-python gen_icon.py
-
-# 2. Сгенерировать version_info.txt
-python gen_version.py
-
-# 3. Собрать
-pyinstaller build.spec --clean
-
-# Результат: dist/RusLOXPy.exe
-```
+MIT. Основано на [RusLOXPy](https://github.com/InVaeR/RusLOXPy).

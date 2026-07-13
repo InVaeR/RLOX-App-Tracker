@@ -2,7 +2,7 @@ import logging
 import sys
 from logging.handlers import RotatingFileHandler
 
-from rlox_app_tracker.paths import LOG_PATH, DATA_DIR
+from rlox_app_tracker.paths import DATA_DIR
 
 
 def setup_logging():

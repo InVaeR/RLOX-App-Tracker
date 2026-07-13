@@ -1,5 +1,4 @@
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal
-
 from services.updater import check_for_update
 
 

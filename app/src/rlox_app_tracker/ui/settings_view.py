@@ -1,16 +1,30 @@
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QFormLayout, QSpinBox, QDoubleSpinBox,
-    QCheckBox, QPushButton, QMessageBox, QGroupBox, QLabel,
+    QCheckBox,
+    QDoubleSpinBox,
+    QFormLayout,
+    QGroupBox,
+    QLabel,
+    QMessageBox,
+    QPushButton,
     QScrollArea,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
 )
-from rlox_app_tracker.services.config_manager import ConfigManager
-from rlox_app_tracker.services.autostart import enable_autostart, disable_autostart, is_autostart_enabled
-from rlox_app_tracker.services.launcher_bridge import check_updates_interactive
+
 from rlox_app_tracker.data.repository import Repository
-from rlox_app_tracker.version import __version__
-from rlox_app_tracker.defaults import DEFAULT_IDLE_THRESHOLD, DEFAULT_POLL_INTERVAL, DEFAULT_SAVE_TITLES, DEFAULT_MINIMIZE_TO_TRAY
+from rlox_app_tracker.defaults import (
+    DEFAULT_IDLE_THRESHOLD,
+    DEFAULT_MINIMIZE_TO_TRAY,
+    DEFAULT_POLL_INTERVAL,
+    DEFAULT_SAVE_TITLES,
+)
+from rlox_app_tracker.services.autostart import disable_autostart, enable_autostart, is_autostart_enabled
+from rlox_app_tracker.services.config_manager import ConfigManager
+from rlox_app_tracker.services.launcher_bridge import check_updates_interactive
 from rlox_app_tracker.ui.theme import PALETTE as C
+from rlox_app_tracker.version import __version__
 
 
 class SettingsView(QWidget):

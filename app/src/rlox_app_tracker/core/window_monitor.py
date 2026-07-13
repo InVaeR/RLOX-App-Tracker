@@ -1,9 +1,9 @@
 import logging
-from typing import Optional, Dict
+from typing import Dict, Optional
 
+import psutil
 import win32gui
 import win32process
-import psutil
 
 logger = logging.getLogger(__name__)
 

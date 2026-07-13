@@ -1,4 +1,5 @@
-from rlox_app_tracker.ui.theme import PALETTE as C, RADIUS as R
+from rlox_app_tracker.ui.theme import PALETTE as C
+from rlox_app_tracker.ui.theme import RADIUS as R
 
 APP_QSS = f"""
 * {{

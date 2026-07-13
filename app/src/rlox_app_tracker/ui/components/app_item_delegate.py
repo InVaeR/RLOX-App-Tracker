@@ -1,6 +1,7 @@
-from PySide6.QtWidgets import QStyledItemDelegate, QStyle
-from PySide6.QtCore import Qt, QSize, QRect
+from PySide6.QtCore import QRect, QSize, Qt
 from PySide6.QtGui import QColor, QFont
+from PySide6.QtWidgets import QStyle, QStyledItemDelegate
+
 from rlox_app_tracker.ui.theme import PALETTE as C
 
 

@@ -1,22 +1,35 @@
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QComboBox,
-    QLabel, QTableWidget, QTableWidgetItem, QHeaderView, QFrame,
-    QGraphicsOpacityEffect, QStackedWidget, QPushButton, QFileDialog,
-    QScrollArea, QMessageBox,
-)
-from PySide6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QTimer
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt, QTimer
 from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import (
+    QComboBox,
+    QFileDialog,
+    QFrame,
+    QGraphicsOpacityEffect,
+    QGridLayout,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QStackedWidget,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
-from rlox_app_tracker.services.reporter import Reporter
-from rlox_app_tracker.ui.theme import PALETTE as C, SPACING as S
-from rlox_app_tracker.utils.format import fmt_duration
-from rlox_app_tracker.ui.components.stat_card import StatCard
-from rlox_app_tracker.ui.components.bar_chart import ChartContainer
-from rlox_app_tracker.ui.components.legend import Legend
-from rlox_app_tracker.ui.components.empty_state import EmptyState
-from rlox_app_tracker.ui.components.app_icons import get_app_icon, asset_pixmap
-from rlox_app_tracker.utils.pixmap import tint_pixmap
 from rlox_app_tracker.data.models import AppStats
+from rlox_app_tracker.services.reporter import Reporter
+from rlox_app_tracker.ui.components.app_icons import asset_pixmap, get_app_icon
+from rlox_app_tracker.ui.components.bar_chart import ChartContainer
+from rlox_app_tracker.ui.components.empty_state import EmptyState
+from rlox_app_tracker.ui.components.legend import Legend
+from rlox_app_tracker.ui.components.stat_card import StatCard
+from rlox_app_tracker.ui.theme import PALETTE as C
+from rlox_app_tracker.ui.theme import SPACING as S
+from rlox_app_tracker.utils.format import fmt_duration
+from rlox_app_tracker.utils.pixmap import tint_pixmap
 
 
 class NumericItem(QTableWidgetItem):

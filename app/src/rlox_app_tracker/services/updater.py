@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-from rlox_app_tracker.version import __version_base__
 from rlox_app_tracker.metadata import MANIFEST_URL as UPDATE_URL
+from rlox_app_tracker.version import __version_base__
 
 logger = logging.getLogger(__name__)
 

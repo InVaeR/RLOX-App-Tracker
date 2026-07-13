@@ -1,4 +1,4 @@
-from PySide6.QtGui import QPixmap, QPainter, QColor
+from PySide6.QtGui import QColor, QPainter, QPixmap
 
 
 def tint_pixmap(src: QPixmap, color: str) -> QPixmap:

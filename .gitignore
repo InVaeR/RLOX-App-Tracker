@@ -9,6 +9,8 @@ build/build/
 *.spec
 *.log
 
+.pytest_cache/
+
 # Virtual environment
 venv/
 .venv/

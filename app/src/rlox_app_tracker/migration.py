@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from rlox_app_tracker.paths import DATA_DIR, CONFIG_DIR, MIGRATION_DIR, DB_PATH, APP_CONFIG_PATH
+from rlox_app_tracker.paths import APP_CONFIG_PATH, CONFIG_DIR, DATA_DIR, DB_PATH, MIGRATION_DIR
 
 logger = logging.getLogger(__name__)
 

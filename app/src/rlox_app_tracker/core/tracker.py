@@ -1,16 +1,16 @@
-from datetime import datetime
-from typing import Optional, Dict, List
-from dataclasses import dataclass
 import time
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Dict, List, Optional
 
 from PySide6.QtCore import QObject, QTimer, Signal
 
-from rlox_app_tracker.defaults import DEFAULT_POLL_INTERVAL, DEFAULT_IDLE_THRESHOLD
-from rlox_app_tracker.core.window_monitor import get_active_window_process
 from rlox_app_tracker.core.idle_detector import get_idle_seconds
 from rlox_app_tracker.core.process_scanner import get_running_process_names
-from rlox_app_tracker.data.repository import Repository
+from rlox_app_tracker.core.window_monitor import get_active_window_process
 from rlox_app_tracker.data.models import Session, WatchedApp
+from rlox_app_tracker.data.repository import Repository
+from rlox_app_tracker.defaults import DEFAULT_IDLE_THRESHOLD, DEFAULT_POLL_INTERVAL
 from rlox_app_tracker.services.config_manager import ConfigManager
 
 

@@ -1,10 +1,10 @@
 """Тесты репозитория с временной БД."""
-import pytest
 from pathlib import Path
 
+import pytest
 from rlox_app_tracker.data.database import Database
+from rlox_app_tracker.data.models import Session, WatchedApp
 from rlox_app_tracker.data.repository import Repository
-from rlox_app_tracker.data.models import WatchedApp, Session
 
 
 @pytest.fixture

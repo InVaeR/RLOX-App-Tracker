@@ -1,7 +1,7 @@
 from typing import List, Optional
 
-from rlox_app_tracker.data.repository import Repository
 from rlox_app_tracker.data.models import WatchedApp
+from rlox_app_tracker.data.repository import Repository
 
 
 class WatchListManager:

@@ -2,15 +2,9 @@
 import json
 from pathlib import Path
 
-import pytest
-
 from rlox_app_tracker.migration import (
-    needs_migration,
     migrate,
-    MIGRATION_MARKER,
-    OLD_APPDATA,
-    DB_PATH,
-    APP_CONFIG_PATH,
+    needs_migration,
 )
 
 

@@ -1,28 +1,36 @@
+from PySide6.QtCore import QSize, Qt, QTimer
+from PySide6.QtGui import QAction, QBrush, QColor, QIcon, QKeySequence, QPainter, QPixmap, QShortcut
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QPushButton,
-    QLabel, QButtonGroup, QStatusBar, QSystemTrayIcon, QMenu,
     QApplication,
+    QButtonGroup,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMenu,
+    QPushButton,
+    QStatusBar,
+    QSystemTrayIcon,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtCore import Qt, QTimer, QSize
-from PySide6.QtGui import (QIcon, QPixmap, QPainter, QBrush, QColor,
-                           QAction, QShortcut, QKeySequence)
 
-from rlox_app_tracker.ui.dashboard_view import DashboardView
-from rlox_app_tracker.ui.watchlist_view import WatchListView
-from rlox_app_tracker.ui.settings_view import SettingsView
-from rlox_app_tracker.ui.components.fade_stack import FadeStack
-from rlox_app_tracker.ui.components.pause_banner import PauseBanner
-from rlox_app_tracker.ui.components.app_icons import asset_icon, asset_pixmap
-from rlox_app_tracker.ui.theme import PALETTE as C, SPACING as S
 from rlox_app_tracker.core.tracker import TrackerService
 from rlox_app_tracker.data.repository import Repository
+from rlox_app_tracker.metadata import PRODUCT_NAME
+from rlox_app_tracker.paths import ICON_PATH
 from rlox_app_tracker.services.config_manager import ConfigManager
+from rlox_app_tracker.services.launcher_bridge import check_updates_interactive, check_updates_silent
 from rlox_app_tracker.services.reporter import Reporter
 from rlox_app_tracker.services.watchlist import WatchListManager
-from rlox_app_tracker.services.launcher_bridge import check_updates_silent, check_updates_interactive
+from rlox_app_tracker.ui.components.app_icons import asset_icon, asset_pixmap
+from rlox_app_tracker.ui.components.fade_stack import FadeStack
+from rlox_app_tracker.ui.components.pause_banner import PauseBanner
+from rlox_app_tracker.ui.dashboard_view import DashboardView
+from rlox_app_tracker.ui.settings_view import SettingsView
+from rlox_app_tracker.ui.theme import PALETTE as C
+from rlox_app_tracker.ui.theme import SPACING as S
+from rlox_app_tracker.ui.watchlist_view import WatchListView
 from rlox_app_tracker.utils.format import fmt_duration
-from rlox_app_tracker.paths import ICON_PATH
-from rlox_app_tracker.version import __version__ as APP_VERSION
 
 
 class NavButton(QPushButton):
@@ -48,7 +56,7 @@ class MainWindow(QMainWindow):
         self._closing = False
         self._watched_count = len(repo.get_all_watched_apps())
 
-        self.setWindowTitle("RusLOXPy")
+        self.setWindowTitle(PRODUCT_NAME)
         self.setMinimumSize(960, 640)
 
         watchlist_mgr = WatchListManager(repo)
@@ -81,7 +89,7 @@ class MainWindow(QMainWindow):
         logo_icon = QLabel()
         if not logo_pix.isNull():
             logo_icon.setPixmap(logo_pix)
-        logo_text = QLabel("RusLOXPy")
+        logo_text = QLabel(PRODUCT_NAME)
         logo_text.setStyleSheet(
             "font-size:18px; font-weight:700;")
         logo_row_layout.addWidget(logo_icon)
@@ -217,9 +225,8 @@ class MainWindow(QMainWindow):
 
     def _setup_tray(self):
         self.tray_icon = QSystemTrayIcon(self)
-        self.tray_icon.setToolTip("RusLOXPy")
+        self.tray_icon.setToolTip(PRODUCT_NAME)
         icon = self._load_icon()
-        self.tray_icon.setIcon(icon)
         self.setWindowIcon(icon)
         tray_menu = QMenu(self)
         show_action = QAction("Показать", self)
@@ -243,14 +250,14 @@ class MainWindow(QMainWindow):
 
     def _update_tray_tooltip(self, info: dict):
         if info.get("paused"):
-            self.tray_icon.setToolTip("RusLOXPy — пауза")
+            self.tray_icon.setToolTip(f"{PRODUCT_NAME} — пауза")
         elif info.get("focused"):
             name = info.get("focused_display") or info.get("focused")
             sec = info.get("focused_sec", 0)
             self.tray_icon.setToolTip(
-                f"RusLOXPy — {name} · {fmt_duration(sec, short=True)}")
+                f"{PRODUCT_NAME} — {name} · {fmt_duration(sec, short=True)}")
         else:
-            self.tray_icon.setToolTip("RusLOXPy")
+            self.tray_icon.setToolTip(PRODUCT_NAME)
 
     def _toggle_pause(self, checked):
         if checked:

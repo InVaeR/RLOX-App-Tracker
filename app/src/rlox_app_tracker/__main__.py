@@ -1,24 +1,23 @@
-import sys
-import os
-import json
 import argparse
+import json
 import logging
-from pathlib import Path
+import os
+import sys
 
-from PySide6.QtWidgets import QApplication, QStyleFactory, QMessageBox
-from PySide6.QtNetwork import QLocalSocket, QLocalServer
 from PySide6.QtCore import QObject
+from PySide6.QtNetwork import QLocalServer, QLocalSocket
+from PySide6.QtWidgets import QApplication, QMessageBox, QStyleFactory
 
+from rlox_app_tracker.core.tracker import TrackerService
 from rlox_app_tracker.data.database import Database
 from rlox_app_tracker.data.repository import Repository
+from rlox_app_tracker.metadata import APP_EXE_NAME, PRODUCT_NAME, SINGLETON_KEY_APP
+from rlox_app_tracker.paths import STATE_DIR
 from rlox_app_tracker.services.config_manager import ConfigManager
-from rlox_app_tracker.core.tracker import TrackerService
 from rlox_app_tracker.ui.main_window import MainWindow
 from rlox_app_tracker.ui.style import APP_QSS
-from rlox_app_tracker.metadata import PRODUCT_NAME, APP_EXE_NAME, SINGLETON_KEY_APP
-from rlox_app_tracker.version import __version__
 from rlox_app_tracker.utils.logger import setup_logging
-from rlox_app_tracker.paths import APP_DIR, DB_PATH, STATE_DIR
+from rlox_app_tracker.version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +176,14 @@ def main(argv=None):
     app.aboutToQuit.connect(cleanup)
 
     tracker.start()
-    window.show()
+
+    if args.background:
+        window.hide()
+        logger.info("Запуск в фоне (трей)")
+    elif args.minimized:
+        window.showMinimized()
+    else:
+        window.show()
 
     write_startup_marker()
     logger.info("Startup marker создан")

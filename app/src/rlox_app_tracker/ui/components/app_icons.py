@@ -1,7 +1,9 @@
 import os
-from PySide6.QtWidgets import QFileIconProvider
-from PySide6.QtGui import QIcon, QPixmap
+
 from PySide6.QtCore import QFileInfo
+from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtWidgets import QFileIconProvider
+
 from rlox_app_tracker.paths import APP_DIR
 
 _provider = QFileIconProvider()

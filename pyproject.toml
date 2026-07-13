@@ -11,6 +11,9 @@ dependencies = [
     "pywin32>=306",
 ]
 
+[project.scripts]
+rlox-app-tracker = "rlox_app_tracker.__main__:main"
+
 [project.optional-dependencies]
 dev = [
     "pyinstaller>=6.0",
@@ -21,7 +24,7 @@ dev = [
 
 [tool.ruff]
 target-version = "py311"
-line-length = 120
+line-length = 160
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]

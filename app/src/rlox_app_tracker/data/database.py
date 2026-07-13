@@ -1,8 +1,8 @@
 import datetime
 import sqlite3
 import threading
-from pathlib import Path
 from contextlib import contextmanager
+from pathlib import Path
 
 from rlox_app_tracker.paths import DB_PATH
 

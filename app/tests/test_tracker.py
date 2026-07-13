@@ -4,9 +4,8 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from rlox_app_tracker.core.tracker import TrackerService, _SessionState
-from rlox_app_tracker.data.models import WatchedApp, Session
+from rlox_app_tracker.data.models import WatchedApp
 
 
 @pytest.fixture

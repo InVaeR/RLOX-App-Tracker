@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from rlox_app_tracker.data.database import Database
-from rlox_app_tracker.data.models import WatchedApp, Session, AppStats
+from rlox_app_tracker.data.models import AppStats, Session, WatchedApp
 
 
 class Repository:
@@ -52,7 +52,8 @@ class Repository:
 
     def update_session(self, session: Session):
         self.db.execute(
-            "UPDATE sessions SET end_time = ?, duration_sec = ?, active_sec = ?, background_sec = ?, window_title = COALESCE(?, window_title), last_seen_at = ? WHERE id = ?",
+            "UPDATE sessions SET end_time = ?, duration_sec = ?, active_sec = ?, "
+            "background_sec = ?, window_title = COALESCE(?, window_title), last_seen_at = ? WHERE id = ?",  # noqa: E501
             (session.end_time, session.duration_sec, session.active_sec, session.background_sec, session.window_title, session.end_time, session.id),
         )
         self.db.commit()
@@ -73,7 +74,8 @@ class Repository:
 
     def close_all_active_sessions(self):
         self.db.execute(
-            "UPDATE sessions SET end_time = COALESCE(last_seen_at, ?), duration_sec = COALESCE(active_sec,0) + COALESCE(background_sec,0) WHERE end_time IS NULL",
+            "UPDATE sessions SET end_time = COALESCE(last_seen_at, ?), "
+            "duration_sec = COALESCE(active_sec,0) + COALESCE(background_sec,0) WHERE end_time IS NULL",
             (datetime.now(),),
         )
         self.db.commit()
