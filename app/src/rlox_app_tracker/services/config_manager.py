@@ -1,7 +1,7 @@
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from rlox_app_tracker.paths import APP_CONFIG_PATH as CONFIG_PATH
 
@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class ConfigManager:
-    def __init__(self, path: Path = None):
+    def __init__(self, path: Optional[Path] = None):
         self._path = path or CONFIG_PATH
         self._data: dict = {}
         self._migrate_old()

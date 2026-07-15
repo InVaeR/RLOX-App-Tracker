@@ -52,7 +52,7 @@ class Repository:
         )
         self.db.commit()
 
-    def flush_session(self, session_id: int, duration_sec: int, active_sec: int, background_sec: int, title: str = None):
+    def flush_session(self, session_id: int, duration_sec: int, active_sec: int, background_sec: int, title: Optional[str] = None):
         now = datetime.now()
         if title:
             self.db.execute(

@@ -32,14 +32,15 @@ internal static class ProcessManager
 
     public static bool IsAppRunning()
     {
-        var expectedDir = AppPaths.InstallDir;
+        var expectedDir = Path.TrimEndingDirectorySeparator(
+            Path.GetFullPath(AppPaths.InstallDir));
         foreach (var proc in Process.GetProcessesByName("RLOXAppTracker"))
         {
             try
             {
                 var path = proc.MainModule?.FileName;
                 if (path != null &&
-                    path.StartsWith(expectedDir, StringComparison.OrdinalIgnoreCase))
+                    Path.GetFullPath(path).StartsWith(expectedDir, StringComparison.OrdinalIgnoreCase))
                 {
                     return true;
                 }

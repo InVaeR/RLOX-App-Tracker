@@ -19,7 +19,7 @@ from rlox_app_tracker.data.repository import Repository
 from rlox_app_tracker.metadata import PRODUCT_NAME
 from rlox_app_tracker.paths import ICON_PATH
 from rlox_app_tracker.services.config_manager import ConfigManager
-from rlox_app_tracker.services.launcher_bridge import check_updates_interactive, check_updates_silent
+from rlox_app_tracker.services.launcher_bridge import check_updates_silent
 from rlox_app_tracker.services.reporter import Reporter
 from rlox_app_tracker.services.watchlist import WatchListManager
 from rlox_app_tracker.ui.components.app_icons import asset_icon, asset_pixmap
@@ -152,12 +152,6 @@ class MainWindow(QMainWindow):
 
     def _check_update_startup(self):
         check_updates_silent()
-
-    def _manual_check_update(self):
-        from PySide6.QtWidgets import QMessageBox
-
-        if not check_updates_interactive():
-            QMessageBox.information(self, "Проверка обновлений", "Лаунчер не найден. Обновления можно проверить только через установленную версию программы.")
 
     def _nav_to(self, idx: int):
         self.nav_group.button(idx).setChecked(True)

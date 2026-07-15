@@ -8,10 +8,10 @@
 #define MyAutostartValue "RLOXAppTracker"
 
 #ifndef AppVersion
-  #define AppVersion "2.0.1"
+  #define AppVersion "2.0.2"
 #endif
 #ifndef AppVersionNumeric
-  #define AppVersionNumeric "2.0.1.0"
+  #define AppVersionNumeric "2.0.2.0"
 #endif
 
 [Setup]

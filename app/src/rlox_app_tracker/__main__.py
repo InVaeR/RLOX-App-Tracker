@@ -1,4 +1,5 @@
 import argparse
+import datetime as _dt
 import json
 import logging
 import os
@@ -124,7 +125,7 @@ def write_startup_marker():
             {
                 "version": __version__,
                 "pid": os.getpid(),
-                "timestamp": __import__("datetime").datetime.now().isoformat(),
+                "timestamp": _dt.datetime.now().isoformat(),
             }
         ),
         encoding="utf-8",

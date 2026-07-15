@@ -8,7 +8,7 @@ class WatchListManager:
     def __init__(self, repo: Repository):
         self.repo = repo
 
-    def add_app(self, process_name: str, exe_path: str = None, display_name: str = None) -> int:
+    def add_app(self, process_name: str, exe_path: Optional[str] = None, display_name: Optional[str] = None) -> int:
         if self.repo.is_watched(process_name):
             return -1
         app = WatchedApp(

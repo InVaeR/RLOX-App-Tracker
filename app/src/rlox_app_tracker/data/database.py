@@ -4,6 +4,7 @@ import sqlite3
 import threading
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Optional
 
 from rlox_app_tracker.paths import DB_PATH
 
@@ -24,10 +25,10 @@ sqlite3.register_converter("timestamp", _convert_datetime)
 
 
 class Database:
-    def __init__(self, db_path: Path = None):
+    def __init__(self, db_path: Optional[Path] = None):
         self.db_path = db_path or DB_PATH
         self.lock = threading.Lock()
-        self.conn: sqlite3.Connection = None
+        self.conn: Optional[sqlite3.Connection] = None
         self._closed = False
         self._connect()
         self._migrate()

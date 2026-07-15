@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.0.2
+
+- Исправлен поиск лаунчера из приложения (добавлен INSTALL_DIR в кандидаты)
+- Отложено расширение `{app}` до PostInstall — исправлена ошибка "constant expanded before initialization"
+- Оптимизация process scan: один `list_running_apps()` вместо N `process_iter` на приложение
+- Удалён мёртвый код: `_manual_check_update`, `get_running_process_names`, `MANIFEST_URL`
+- Type hints: `Optional` вместо `= None` в signatures
+- Заменён `__import__("datetime")` на нормальный импорт
+- Нормализация путей в `IsAppRunning` (`Path.GetFullPath`)
+- `latest.json` обновляется только для stable-канала
+- `fail_on_unmatched_files: false` в release workflow
+- Версия лаунчера/ installer/ version_info синхронизированы
+
+## 2.0.1
+
+- Исправлено зависание при первом запуске (порядок инициализации, обработчик исключений)
+- Исправлено удаление программы (принудительное завершение процессов, очистка versions/state)
+- Устойчивый singleton (ping/pong перед выводом «уже запущено»)
+- IPC через readyRead без блокировки UI
+- Fallback-запуск любой установленной версии при неудачном rollback
+- Grace-period 60с перед откатом pending-версии
+- Каналы обновлений: dev/beta/stable через отдельные манифесты
+- Миграция: повреждённая БД считается ошибкой, повтор при failed-маркере
+
 ## 2.0.0-alpha.1 — предварительный релиз
 
 - Полная переработка архитектуры (см. ARCHITECTURE.md)
