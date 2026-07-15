@@ -8,10 +8,10 @@
 #define MyAutostartValue "RLOXAppTracker"
 
 #ifndef AppVersion
-  #define AppVersion "2.0.0-alpha.2"
+  #define AppVersion "2.0.0-alpha.3"
 #endif
 #ifndef AppVersionNumeric
-  #define AppVersionNumeric "2.0.0.2"
+  #define AppVersionNumeric "2.0.0.3"
 #endif
 
 [Setup]
@@ -82,7 +82,6 @@ Type: dirifempty; Name: "{app}"
 var
   DataPath: string;
   ProductDataRoot: string;
-  InstallStatePath: string;
   OldDataFound: Boolean;
   IsUpdate: Boolean;
   ExistingCurrentVersion: string;
@@ -163,18 +162,11 @@ begin
   Result := True;
   DataPath := ExpandConstant('{localappdata}') + '\RLOX App Tracker\data';
   ProductDataRoot := ExpandConstant('{localappdata}') + '\RLOX App Tracker';
-  InstallStatePath := ExpandConstant('{app}\state\install.json');
   OldDataFound := DirExists(DataPath);
   IsUpdate := CompareText(ExpandConstant('{param:UPDATE|0}'), '1') = 0;
 
   ExistingCurrentVersion := '';
   ExistingPreviousVersion := '';
-
-  if FileExists(InstallStatePath) then
-  begin
-    ExistingCurrentVersion := ExtractJsonString(InstallStatePath, 'currentVersion');
-    ExistingPreviousVersion := ExtractJsonString(InstallStatePath, 'previousVersion');
-  end;
 end;
 
 procedure WriteInstallJson;
@@ -192,6 +184,13 @@ begin
   ForceDirectories(StateDir);
   StatePath := StateDir + '\install.json';
   TempPath := StatePath + '.tmp';
+
+  if FileExists(StatePath) then
+  begin
+    ExistingCurrentVersion := ExtractJsonString(StatePath, 'currentVersion');
+    ExistingPreviousVersion := ExtractJsonString(StatePath, 'previousVersion');
+  end;
+
   EscapedExe := EscapeBackslash('versions\{#AppVersion}\{#MyAppExeName}');
 
   if IsUpdate and (ExistingCurrentVersion <> '') then
