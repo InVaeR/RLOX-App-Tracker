@@ -7,9 +7,9 @@
     <ApplicationIcon>..\..\..\assets\app.ico</ApplicationIcon>
     <AssemblyName>RLOXLauncher</AssemblyName>
     <RootNamespace>RLOXLauncher</RootNamespace>
-    <Version>2.0.2.0</Version>
-    <FileVersion>2.0.2.0</FileVersion>
-    <AssemblyVersion>2.0.2.0</AssemblyVersion>
+    <Version>2.0.3.0</Version>
+    <FileVersion>2.0.3.0</FileVersion>
+    <AssemblyVersion>2.0.3.0</AssemblyVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <SelfContained>true</SelfContained>

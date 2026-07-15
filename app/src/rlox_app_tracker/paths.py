@@ -9,8 +9,10 @@ _data_root = _local_app_data / PRODUCT_NAME
 
 if getattr(sys, "frozen", False):
     APP_DIR = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+    INSTALL_DIR = Path(sys.executable).resolve().parent.parent.parent
 else:
     APP_DIR = Path(__file__).resolve().parent.parent.parent.parent
+    INSTALL_DIR = _data_root.parent / "Programs" / PRODUCT_NAME
 
 ASSETS_DIR = APP_DIR / "assets"
 ICON_PATH = ASSETS_DIR / "app.ico"
@@ -22,8 +24,7 @@ CONFIG_DIR = _data_root / "config"
 LOGS_DIR = _data_root / "logs"
 UPDATES_DIR = _data_root / "updates"
 MIGRATION_DIR = _data_root / "migration"
-STATE_DIR = _data_root.parent / "Programs" / PRODUCT_NAME / "state"
-INSTALL_DIR = STATE_DIR.parent
+STATE_DIR = INSTALL_DIR / "state"
 
 DB_PATH = DATA_DIR / "tracker.db"
 APP_CONFIG_PATH = CONFIG_DIR / "app.json"

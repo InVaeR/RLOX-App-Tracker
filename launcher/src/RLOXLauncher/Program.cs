@@ -4,7 +4,7 @@ namespace RLOXLauncher;
 
 internal class Program
 {
-    internal const string AppVersion = "2.0.2";
+    internal const string AppVersion = "2.0.3";
     private const string ManifestBaseUrl = "https://github.com/InVaeR/RLOX-App-Tracker/releases/latest/download";
 
     private static string GetManifestUrl(string channel) => $"{ManifestBaseUrl}/{channel}.json";
