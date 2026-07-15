@@ -6,7 +6,7 @@ from typing import Dict, List, Optional
 from PySide6.QtCore import QObject, QTimer, Signal
 
 from rlox_app_tracker.core.idle_detector import get_idle_seconds
-from rlox_app_tracker.core.process_scanner import get_running_process_names
+from rlox_app_tracker.core.process_scanner import list_running_apps
 from rlox_app_tracker.core.window_monitor import get_active_window_process
 from rlox_app_tracker.data.models import Session, WatchedApp
 from rlox_app_tracker.data.repository import Repository
@@ -35,6 +35,7 @@ class _TickContext:
     focused_display: str
     focused_sec: int
     running_names: set
+    running_apps: Dict[str, str]
     watched_apps: List[WatchedApp]
     watched_ids: Dict[int, WatchedApp]
     watched_running: List[dict]
@@ -158,7 +159,8 @@ class TrackerService(QObject):
         idle_now = get_idle_seconds()
         window = get_active_window_process()
         focused_name = window["name"] if window else None
-        running_names = get_running_process_names()
+        running_apps = list_running_apps()
+        running_names = set(running_apps.keys())
         watched_apps = self._get_watched_apps()
         watched_ids = {a.id: a for a in watched_apps if a.id}
 
@@ -192,6 +194,7 @@ class TrackerService(QObject):
             focused_display=focused_display,
             focused_sec=focused_sec,
             running_names=running_names,
+            running_apps=running_apps,
             watched_apps=watched_apps,
             watched_ids=watched_ids,
             watched_running=watched_running,
@@ -203,22 +206,10 @@ class TrackerService(QObject):
         for app in ctx.watched_apps:
             if app.id is None or not app.process_name:
                 continue
-            if app.process_name in ctx.running_names:
-                try:
-                    import psutil
-
-                    for proc in psutil.process_iter(["name", "exe"]):
-                        try:
-                            if proc.info["name"] == app.process_name and proc.info["exe"]:
-                                new_exe = proc.info["exe"]
-                                if app.exe_path != new_exe:
-                                    app.exe_path = new_exe
-                                    self.repo.update_exe_path(app.id, new_exe)
-                                break
-                        except (psutil.NoSuchProcess, psutil.AccessDenied):
-                            continue
-                except Exception:
-                    pass
+            exe = ctx.running_apps.get(app.process_name)
+            if exe and app.exe_path != exe:
+                app.exe_path = exe
+                self.repo.update_exe_path(app.id, exe)
 
     def _update_sessions(self, ctx: _TickContext):
         for app in ctx.watched_apps:

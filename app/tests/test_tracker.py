@@ -38,7 +38,7 @@ def test_tick_normal(tracker):
     with (
         patch("rlox_app_tracker.core.tracker.get_idle_seconds", return_value=5),
         patch("rlox_app_tracker.core.tracker.get_active_window_process", return_value=None),
-        patch("rlox_app_tracker.core.tracker.get_running_process_names", return_value=set()),
+        patch("rlox_app_tracker.core.tracker.list_running_apps", return_value={}),
     ):
         tracker._tick()
     assert tracker._tick_count == 1
@@ -127,7 +127,7 @@ def test_accumulator_handles_fractional(tracker):
     with (
         patch("rlox_app_tracker.core.tracker.get_idle_seconds", return_value=5),
         patch("rlox_app_tracker.core.tracker.get_active_window_process", return_value={"name": "test.exe", "title": "Test"}),
-        patch("rlox_app_tracker.core.tracker.get_running_process_names", return_value={"test.exe"}),
+        patch("rlox_app_tracker.core.tracker.list_running_apps", return_value={"test.exe": "/path/to/test.exe"}),
     ):
         pass
     tracker._update_sessions(ctx)

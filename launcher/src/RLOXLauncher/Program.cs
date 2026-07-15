@@ -85,6 +85,23 @@ internal class Program
             }
         }
 
+        // First install: confirm current version if its marker exists
+        if (!opts.UpdateOnly
+            && installState.PendingVersion == null
+            && !installState.StartupConfirmed
+            && installState.CurrentVersion != null)
+        {
+            var marker = Path.Combine(
+                AppPaths.StateDir,
+                $"startup-ok-{installState.CurrentVersion}");
+            if (File.Exists(marker))
+            {
+                Logger.Info($"Confirming current version {installState.CurrentVersion}");
+                installState.StartupConfirmed = true;
+                installState.Save(AppPaths.InstallJsonPath);
+            }
+        }
+
         // Clean up old versions (keep current + pending + previous)
         // Only when update is confirmed (no pending startup)
         if (installState.IsValid()
@@ -318,7 +335,8 @@ internal class Program
         Logger.Warn($"Pending version {pending} launched but startup marker absent — possible crash");
 
         var current = installState.CurrentVersion;
-        if (current != null)
+        if (current != null &&
+            File.Exists(Path.Combine(AppPaths.VersionsDir, current, "RLOXAppTracker.exe")))
         {
             Logger.Info($"Reverting from pending {pending} to current {current}");
             installState.PendingVersion = null;
@@ -328,7 +346,7 @@ internal class Program
             return true;
         }
 
-        Logger.Warn("No current version to revert to — keeping pending");
+        Logger.Warn("No usable current version to revert to — keeping pending version");
         return false;
     }
 

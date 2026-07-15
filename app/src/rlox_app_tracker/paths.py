@@ -33,5 +33,15 @@ LAUNCHER_LOG_PATH = LOGS_DIR / "launcher.log"
 INSTALL_JSON_PATH = STATE_DIR / "install.json"
 LAUNCHER_PATH = INSTALL_DIR / LAUNCHER_EXE_NAME
 
-for d in [DATA_DIR, CONFIG_DIR, LOGS_DIR, UPDATES_DIR, MIGRATION_DIR, STATE_DIR]:
-    d.mkdir(parents=True, exist_ok=True)
+
+def ensure_runtime_dirs() -> None:
+    """Создаёт runtime-каталоги. Вызывается из bootstrap, не при импорте."""
+    for d in [DATA_DIR, CONFIG_DIR, LOGS_DIR, UPDATES_DIR, MIGRATION_DIR]:
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
+    try:
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass

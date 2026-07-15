@@ -8,10 +8,10 @@
 #define MyAutostartValue "RLOXAppTracker"
 
 #ifndef AppVersion
-  #define AppVersion "2.0.0-alpha.1"
+  #define AppVersion "2.0.0-alpha.2"
 #endif
 #ifndef AppVersionNumeric
-  #define AppVersionNumeric "2.0.0.1"
+  #define AppVersionNumeric "2.0.0.2"
 #endif
 
 [Setup]
@@ -32,7 +32,9 @@ SolidCompression=yes
 UninstallDisplayIcon={app}\{#MyLauncherExeName}
 DisableWelcomePage=no
 DisableReadyPage=no
-CloseApplications=no
+CloseApplications=force
+CloseApplicationsFilter=RLOXLauncher.exe,RLOXAppTracker.exe
+RestartApplications=no
 
 [Languages]
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
@@ -65,7 +67,8 @@ Filename: "{app}\{#MyLauncherExeName}"; Parameters: "--launch --after-update"; D
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#MyAutostartValue}"; ValueData: """{app}\{#MyLauncherExeName}"" --launch --background"; Tasks: autostart; Flags: uninsdeletevalue
 
 [UninstallRun]
-Filename: "{app}\{#MyLauncherExeName}"; Parameters: "--shutdown"; Flags: runhidden waituntilterminated
+; Мягкое завершение приложения через IPC
+Filename: "{app}\{#MyLauncherExeName}"; Parameters: "--shutdown"; Flags: runhidden waituntilterminated; RunOnceId: "ShutdownApp"
 
 [UninstallDelete]
 Type: files; Name: "{app}\state\install.json"
@@ -242,19 +245,51 @@ begin
   end;
 end;
 
+procedure KillProcess(const ExeName: string);
+var
+  ResultCode: Integer;
+begin
+  Exec(
+    ExpandConstant('{sys}\taskkill.exe'),
+    '/F /IM ' + ExeName,
+    '',
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode
+  );
+end;
+
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   ResultCode: Integer;
   Answer: Integer;
 begin
+  if CurUninstallStep = usUninstall then
+  begin
+    KillProcess('{#MyAppExeName}');
+    KillProcess('{#MyLauncherExeName}');
+    Sleep(1500);
+
+    RegDeleteValue(
+      HKEY_CURRENT_USER,
+      'Software\Microsoft\Windows\CurrentVersion\Run',
+      '{#MyAutostartValue}'
+    );
+  end;
+
   if CurUninstallStep = usPostUninstall then
   begin
+    DelTree(ExpandConstant('{app}\versions'), True, True, True);
+    DelTree(ExpandConstant('{app}\state'), True, True, True);
+
     if DirExists(DataPath) then
     begin
       Answer := MsgBox('Удалить также статистику и настройки?', mbConfirmation, MB_YESNO or MB_DEFBUTTON2);
       if Answer = IDYES then
         DelTree(ProductDataRoot, True, True, True);
     end;
+
+    RemoveDir(ExpandConstant('{app}'));
   end;
 end;
 
@@ -270,5 +305,9 @@ begin
   if FileExists(LauncherExe) then
   begin
     Exec(LauncherExe, '--shutdown', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Sleep(1000);
   end;
+  KillProcess('{#MyAppExeName}');
+  KillProcess('{#MyLauncherExeName}');
+  Sleep(1000);
 end;

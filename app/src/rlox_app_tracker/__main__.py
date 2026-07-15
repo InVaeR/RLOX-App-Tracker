@@ -14,7 +14,7 @@ from rlox_app_tracker.data.database import Database
 from rlox_app_tracker.data.repository import Repository
 from rlox_app_tracker.metadata import APP_EXE_NAME, PRODUCT_NAME, SINGLETON_KEY_APP
 from rlox_app_tracker.migration import migrate, needs_migration
-from rlox_app_tracker.paths import DATA_DIR, STATE_DIR
+from rlox_app_tracker.paths import DATA_DIR, STATE_DIR, ensure_runtime_dirs
 from rlox_app_tracker.services.config_manager import ConfigManager
 from rlox_app_tracker.ui.main_window import MainWindow
 from rlox_app_tracker.ui.style import APP_QSS
@@ -44,11 +44,23 @@ class SingleInstance(QObject):
         sock = QLocalSocket()
         sock.connectToServer(self._key)
         if sock.waitForConnected(300):
-            sock.write(b"show\n")
+            sock.write(b"ping\n")
             sock.waitForBytesWritten(500)
+            alive = False
+            if sock.waitForReadyRead(500):
+                resp = sock.readAll().data().decode("utf-8", errors="replace").strip()
+                alive = resp == "pong"
             sock.disconnectFromServer()
             sock.close()
-            return "already_running"
+            if alive:
+                show = QLocalSocket()
+                show.connectToServer(self._key)
+                if show.waitForConnected(300):
+                    show.write(b"show\n")
+                    show.waitForBytesWritten(500)
+                    show.disconnectFromServer()
+                    show.close()
+                return "already_running"
         QLocalServer.removeServer(self._key)
         server = QLocalServer()
         if not server.listen(self._key):
@@ -142,7 +154,13 @@ def main(argv=None):
         success = si.send_command(args.ipc)
         sys.exit(0 if success else 1)
 
-    setup_logging()
+    ensure_runtime_dirs()
+
+    try:
+        setup_logging()
+    except Exception:
+        pass
+
     logger.info("Запуск %s v%s", PRODUCT_NAME, __version__)
 
     app = QApplication(sys.argv)
@@ -150,6 +168,18 @@ def main(argv=None):
     app.setApplicationVersion(__version__)
     app.setStyle(QStyleFactory.create("Fusion"))
     app.setStyleSheet(APP_QSS)
+
+    def _excepthook(exc_type, exc_value, exc_tb):
+        import traceback
+
+        text = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+        logger.error("Необработанное исключение:\n%s", text)
+        try:
+            QMessageBox.critical(None, PRODUCT_NAME, f"Критическая ошибка:\n\n{exc_value}")
+        except Exception:
+            pass
+
+    sys.excepthook = _excepthook
 
     si = SingleInstance()
     result = si.try_acquire()
@@ -162,21 +192,33 @@ def main(argv=None):
         QMessageBox.critical(None, PRODUCT_NAME, "Не удалось запустить приложение: ошибка singleton-механизма.\n\nПопробуйте перезапустить приложение.")
         os._exit(1)
 
-    data_dir = Path(args.data_dir) if args.data_dir else DATA_DIR
-    data_dir.mkdir(parents=True, exist_ok=True)
-    db_path = data_dir / "tracker.db"
+    try:
+        data_dir = Path(args.data_dir) if args.data_dir else DATA_DIR
+        data_dir.mkdir(parents=True, exist_ok=True)
+        db_path = data_dir / "tracker.db"
 
-    if needs_migration():
-        logger.info("Обнаружены данные RusLOXPy, запуск миграции...")
-        migrate()
-        logger.info("Миграция завершена")
+        if needs_migration():
+            logger.info("Обнаружены данные RusLOXPy, запуск миграции...")
+            try:
+                migrate()
+            except Exception:
+                logger.exception("Миграция завершилась с ошибкой (продолжаем)")
+            logger.info("Миграция завершена")
 
-    db = Database(db_path=db_path)
-    repo = Repository(db)
-    config = ConfigManager()
+        db = Database(db_path=db_path)
+        repo = Repository(db)
+        config = ConfigManager()
 
-    tracker = TrackerService(repo, config)
-    window = MainWindow(repo, tracker, config)
+        tracker = TrackerService(repo, config)
+        window = MainWindow(repo, tracker, config)
+    except Exception as e:
+        logger.exception("Ошибка инициализации приложения")
+        QMessageBox.critical(
+            None,
+            PRODUCT_NAME,
+            f"Не удалось инициализировать приложение:\n\n{e}\n\nПроверьте лог: {STATE_DIR}",
+        )
+        os._exit(1)
 
     si.on_shutdown(lambda: _shutdown(app))
     si.on_show(lambda: _show_window(window))
@@ -192,6 +234,12 @@ def main(argv=None):
 
     tracker.start()
 
+    try:
+        write_startup_marker()
+        logger.info("Startup marker создан")
+    except Exception:
+        logger.exception("Не удалось создать startup marker")
+
     if args.background:
         window.hide()
         logger.info("Запуск в фоне (трей)")
@@ -199,9 +247,6 @@ def main(argv=None):
         window.showMinimized()
     else:
         window.show()
-
-    write_startup_marker()
-    logger.info("Startup marker создан")
 
     exit_code = app.exec()
     si.server.close()

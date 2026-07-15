@@ -62,7 +62,8 @@ internal class InstallState
             if (File.Exists(legacyPath)) return legacyPath;
         }
 
-        return null;
+        // Last resort: any installed version
+        return AppLauncher.GetAppExePath();
     }
 
     public static InstallState Load(string path)

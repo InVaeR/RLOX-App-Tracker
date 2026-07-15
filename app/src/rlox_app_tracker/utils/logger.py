@@ -12,6 +12,11 @@ def setup_logging():
     root.setLevel(logging.INFO)
     fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
+    try:
+        LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+
     fh = RotatingFileHandler(
         LOG_PATH,
         maxBytes=2 * 1024 * 1024,
