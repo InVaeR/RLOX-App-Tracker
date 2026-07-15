@@ -16,9 +16,10 @@ logger = logging.getLogger(__name__)
 def _find_launcher() -> Optional[Path]:
     import sys
 
-    from rlox_app_tracker.paths import APP_DIR
+    from rlox_app_tracker.paths import APP_DIR, INSTALL_DIR
 
     candidates = [
+        INSTALL_DIR / "RLOXLauncher.exe",
         APP_DIR / "RLOXLauncher.exe",
         APP_DIR.parent / "RLOXLauncher.exe",
         Path(sys.executable).parent / "RLOXLauncher.exe",
