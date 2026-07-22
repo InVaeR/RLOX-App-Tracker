@@ -87,10 +87,10 @@ QPushButton:hover {{
 QPushButton#primary {{
     background-color: {C.accent};
     border: none;
-    color: #1a3a2f;
+    color: #0d221c;
     font-weight: 600;
 }}
-QPushButton#primary:hover {{ background-color: {C.accent_hover}; color: #1a3a2f; }}
+QPushButton#primary:hover {{ background-color: {C.accent_hover}; color: #0d221c; }}
 QPushButton#danger {{
     background-color: transparent;
     border: 1px solid {C.danger};

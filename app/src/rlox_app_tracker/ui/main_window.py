@@ -251,7 +251,7 @@ class MainWindow(QMainWindow):
         pixmap = QPixmap(64, 64)
         pixmap.fill(Qt.GlobalColor.transparent)
         p = QPainter(pixmap)
-        p.setBrush(QBrush(QColor(91, 141, 239)))
+        p.setBrush(QBrush(QColor(20, 250, 177)))
         p.setPen(Qt.PenStyle.NoPen)
         p.drawRoundedRect(4, 4, 56, 56, 8, 8)
         p.end()

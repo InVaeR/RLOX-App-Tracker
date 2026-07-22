@@ -69,8 +69,8 @@ jobs:
           }
 
           & $iscc `
-            "/DAppVersion=2.0.3" `
-            "/DAppVersionNumeric=2.0.3.0" `
+            "/DAppVersion=2.0.4" `
+            "/DAppVersionNumeric=2.0.4.0" `
             "installer/RLOXAppTracker.iss"
 
           if ($LASTEXITCODE -ne 0) {
